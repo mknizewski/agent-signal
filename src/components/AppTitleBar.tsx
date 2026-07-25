@@ -42,7 +42,11 @@ export function AppTitleBar({
   };
 
   return (
-    <header className="app-titlebar">
+    <header
+      className={`app-titlebar ${
+        compact ? "app-titlebar--compact" : ""
+      }`}
+    >
       <div
         className="app-titlebar__menus"
         ref={menuRoot}
@@ -56,68 +60,68 @@ export function AppTitleBar({
           <i />
         </span>
 
-        <div className="app-menu">
-          <button
-            className={openMenu === "file" ? "is-open" : ""}
-            type="button"
-            aria-haspopup="menu"
-            aria-expanded={openMenu === "file"}
-            onClick={() => toggleMenu("file")}
-          >
-            {copy.titlebar.file}
-          </button>
-          {openMenu === "file" && (
-            <div
-              className="app-menu__popover"
-              role="menu"
-            >
+        {!compact && (
+          <>
+            <div className="app-menu">
               <button
+                className={openMenu === "file" ? "is-open" : ""}
                 type="button"
-                role="menuitem"
-                onClick={() => {
-                  setOpenMenu(null);
-                  void agentApi.exitApp();
-                }}
+                aria-haspopup="menu"
+                aria-expanded={openMenu === "file"}
+                onClick={() => toggleMenu("file")}
               >
-                <span>{copy.titlebar.exit}</span>
-                <kbd>Alt+F4</kbd>
+                {copy.titlebar.file}
               </button>
+              {openMenu === "file" && (
+                <div
+                  className="app-menu__popover"
+                  role="menu"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setOpenMenu(null);
+                      void agentApi.exitApp();
+                    }}
+                  >
+                    <span>{copy.titlebar.exit}</span>
+                    <kbd>Alt+F4</kbd>
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        <div className="app-menu">
-          <button
-            className={openMenu === "view" ? "is-open" : ""}
-            type="button"
-            aria-haspopup="menu"
-            aria-expanded={openMenu === "view"}
-            onClick={() => toggleMenu("view")}
-          >
-            {copy.titlebar.view}
-          </button>
-          {openMenu === "view" && (
-            <div
-              className="app-menu__popover"
-              role="menu"
-            >
+            <div className="app-menu">
               <button
+                className={openMenu === "view" ? "is-open" : ""}
                 type="button"
-                role="menuitem"
-                onClick={() => {
-                  setOpenMenu(null);
-                  onToggleCompact();
-                }}
+                aria-haspopup="menu"
+                aria-expanded={openMenu === "view"}
+                onClick={() => toggleMenu("view")}
               >
-                <span>
-                  {compact
-                    ? copy.titlebar.fullView
-                    : copy.titlebar.compactView}
-                </span>
+                {copy.titlebar.view}
               </button>
+              {openMenu === "view" && (
+                <div
+                  className="app-menu__popover"
+                  role="menu"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setOpenMenu(null);
+                      onToggleCompact();
+                    }}
+                  >
+                    <span>{copy.titlebar.compactView}</span>
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
       <div className="app-titlebar__drag" />
     </header>

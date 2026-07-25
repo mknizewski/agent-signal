@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  extractCodexCollabStatuses,
   isCodexSubagentThread,
   mapClaudeSession,
   mapCodexSubagent,
@@ -134,7 +135,7 @@ describe("external session mapping", () => {
     });
   });
 
-  it("treats an unloaded spawned thread as completed", () => {
+  it("does not infer completion from a not-loaded subagent thread", () => {
     const subagent = mapCodexSubagent(
       {
         id: "completed-child",
@@ -152,8 +153,157 @@ describe("external session mapping", () => {
       now
     );
 
-    expect(subagent?.status).toBe("idle");
+    expect(subagent?.status).toBe("unavailable");
     expect(subagent?.depth).toBe(2);
+  });
+
+  it("uses the parent collab state when a running subagent is not loaded", () => {
+    const thread = {
+      id: "running-child",
+      status: { type: "notLoaded" },
+      source: {
+        subAgent: {
+          thread_spawn: {
+            parent_thread_id: "parent-thread"
+          }
+        }
+      }
+    };
+
+    expect(mapCodexSubagent(thread, now, "running")?.status).toBe(
+      "working"
+    );
+    expect(mapCodexSubagent(thread, now, "completed")?.status).toBe(
+      "idle"
+    );
+  });
+
+  it("keeps a live child working when the parent state is stale", () => {
+    const subagent = mapCodexSubagent(
+      {
+        id: "live-child",
+        status: { type: "active" },
+        source: {
+          subAgent: {
+            thread_spawn: {
+              parent_thread_id: "parent-thread"
+            }
+          }
+        }
+      },
+      now,
+      "completed"
+    );
+
+    expect(subagent?.status).toBe("working");
+  });
+
+  it("extracts the latest official collab state per child thread", () => {
+    const statuses = extractCodexCollabStatuses({
+      id: "parent-thread",
+      turns: [
+        {
+          items: [
+            {
+              type: "collabAgentToolCall",
+              agentsStates: {
+                "child-one": { status: "pendingInit" },
+                "child-two": { status: "running" }
+              }
+            }
+          ]
+        },
+        {
+          items: [
+            {
+              type: "collabAgentToolCall",
+              agentsStates: {
+                "child-one": { status: "running" },
+                "child-two": { status: "completed" },
+                malformed: { status: "madeUp" }
+              }
+            }
+          ]
+        }
+      ]
+    });
+
+    expect(Object.fromEntries(statuses)).toEqual({
+      "child-one": "running",
+      "child-two": "completed"
+    });
+  });
+
+  it("uses the parent turn lifecycle when Codex only persists subagent activity", () => {
+    const running = extractCodexCollabStatuses({
+      id: "running-parent",
+      turns: [
+        {
+          status: "inProgress",
+          items: [
+            {
+              type: "subAgentActivity",
+              kind: "started",
+              agentThreadId: "running-child"
+            }
+          ]
+        }
+      ]
+    });
+    const completed = extractCodexCollabStatuses({
+      id: "completed-parent",
+      turns: [
+        {
+          status: "completed",
+          items: [
+            {
+              type: "collabAgentToolCall",
+              agentsStates: {
+                "completed-child": { status: "running" }
+              }
+            },
+            {
+              type: "subAgentActivity",
+              kind: "started",
+              agentThreadId: "completed-child"
+            }
+          ]
+        }
+      ]
+    });
+
+    expect(Object.fromEntries(running)).toEqual({
+      "running-child": "running"
+    });
+    expect(Object.fromEntries(completed)).toEqual({
+      "completed-child": "completed"
+    });
+  });
+
+  it("keeps an explicitly completed child completed while its parent still runs", () => {
+    const statuses = extractCodexCollabStatuses({
+      id: "mixed-parent",
+      turns: [
+        {
+          status: "inProgress",
+          items: [
+            {
+              type: "collabAgentToolCall",
+              agentsStates: {
+                "done-child": { status: "completed" }
+              }
+            },
+            {
+              type: "subAgentActivity",
+              kind: "started",
+              agentThreadId: "done-child"
+            }
+          ]
+        }
+      ]
+    });
+
+    expect(statuses.get("done-child")).toBe("completed");
   });
 
   it("does not infer a team relationship without thread-spawn metadata", () => {

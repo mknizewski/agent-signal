@@ -37,6 +37,10 @@ async function main() {
   const claude = sessions.filter(
     (session) => session.source === "claude-code"
   ).length;
+  const subagentStatuses = subagents.reduce((counts, subagent) => {
+    counts[subagent.status] = (counts[subagent.status] ?? 0) + 1;
+    return counts;
+  }, {});
 
   console.log(
     JSON.stringify({
@@ -45,6 +49,7 @@ async function main() {
       codex,
       claude,
       subagents: subagents.length,
+      subagentStatuses,
       codexExecutable: providers.codex.executable,
       claudeAvailable: providers.claude.available,
       inspectedStatus: inspectedThreadId

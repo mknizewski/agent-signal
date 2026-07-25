@@ -109,6 +109,14 @@ body {
   flex: 1;
 }
 
+.app-titlebar--compact .app-titlebar__menus {
+  padding-left: 10px;
+}
+
+.app-titlebar--compact .app-titlebar__icon {
+  margin-right: 0;
+}
+
 .app-menu {
   position: relative;
   height: 100%;
@@ -2651,6 +2659,12 @@ html[data-compact="true"] body {
 .compact-header .icon-button {
   width: 30px;
   height: 30px;
+}
+
+.compact-header .compact-exit:hover {
+  color: #fff;
+  border-color: color-mix(in srgb, var(--working) 45%, var(--line));
+  background: color-mix(in srgb, var(--working) 14%, var(--surface));
 }
 
 .compact-dashboard {

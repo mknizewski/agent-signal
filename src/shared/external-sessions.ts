@@ -10,6 +10,21 @@ export interface CodexThreadStatus {
   activeFlags?: string[];
 }
 
+export type CodexCollabAgentStatus =
+  | "pendingInit"
+  | "running"
+  | "interrupted"
+  | "completed"
+  | "errored"
+  | "shutdown"
+  | "notFound";
+
+type CodexTurnStatus =
+  | "completed"
+  | "interrupted"
+  | "failed"
+  | "inProgress";
+
 export interface CodexExternalThread {
   id: string;
   name?: string | null;
@@ -22,6 +37,10 @@ export interface CodexExternalThread {
   logActivity?: "working" | "attention" | "idle" | "unknown";
   agentNickname?: string | null;
   agentRole?: string | null;
+  turns?: Array<{
+    status?: CodexTurnStatus | string;
+    items?: unknown[];
+  }>;
   source?:
     | string
     | {
@@ -85,7 +104,8 @@ export function isCodexSubagentThread(
 
 export function mapCodexSubagent(
   thread: CodexExternalThread,
-  now = new Date()
+  now = new Date(),
+  collabStatus?: CodexCollabAgentStatus
 ): SessionSubagent | undefined {
   const source = subagentSpawnSource(thread);
   if (!source?.parent_thread_id) return undefined;
@@ -97,7 +117,7 @@ export function mapCodexSubagent(
   const role =
     cleanText(thread.agentRole) ||
     cleanText(source.agent_role);
-  const status = codexSubagentStatus(thread);
+  const status = codexSubagentStatus(thread, collabStatus);
 
   return {
     id: `codex-subagent:${thread.id}`,
@@ -117,6 +137,63 @@ export function mapCodexSubagent(
     status,
     updatedAt
   };
+}
+
+export function extractCodexCollabStatuses(
+  thread: CodexExternalThread
+): Map<string, CodexCollabAgentStatus> {
+  const result = new Map<string, CodexCollabAgentStatus>();
+  for (const turn of thread.turns ?? []) {
+    const activityByThread = new Map<string, string>();
+    for (const item of turn.items ?? []) {
+      if (!item || typeof item !== "object") continue;
+      const candidate = item as {
+        type?: unknown;
+        agentsStates?: unknown;
+        agentThreadId?: unknown;
+        kind?: unknown;
+      };
+      if (
+        candidate.type === "subAgentActivity" &&
+        typeof candidate.agentThreadId === "string" &&
+        candidate.agentThreadId
+      ) {
+        activityByThread.set(
+          candidate.agentThreadId,
+          typeof candidate.kind === "string" ? candidate.kind : ""
+        );
+      }
+      if (
+        candidate.type !== "collabAgentToolCall" ||
+        !candidate.agentsStates ||
+        typeof candidate.agentsStates !== "object"
+      ) {
+        continue;
+      }
+      for (const [threadId, state] of Object.entries(
+        candidate.agentsStates
+      )) {
+        if (!threadId || !state || typeof state !== "object") continue;
+        const status = (state as { status?: unknown }).status;
+        if (isCodexCollabAgentStatus(status)) {
+          result.set(threadId, status);
+        }
+      }
+    }
+
+    const parentTurnStatus = collabStatusFromTurn(turn.status);
+    for (const [threadId, activityKind] of activityByThread) {
+      if (activityKind === "interrupted") {
+        result.set(threadId, "interrupted");
+      } else if (
+        parentTurnStatus &&
+        (parentTurnStatus !== "running" || !result.has(threadId))
+      ) {
+        result.set(threadId, parentTurnStatus);
+      }
+    }
+  }
+  return result;
 }
 
 export function mapClaudeSession(
@@ -187,7 +264,8 @@ function codexStatus(
 }
 
 function codexSubagentStatus(
-  thread: CodexExternalThread
+  thread: CodexExternalThread,
+  collabStatus?: CodexCollabAgentStatus
 ): SessionStatus {
   const runtimeStatus = thread.status?.type;
   const activeFlags = thread.status?.activeFlags ?? [];
@@ -199,12 +277,49 @@ function codexSubagentStatus(
   ) {
     return "attention";
   }
-  if (runtimeStatus === "active") return "working";
   if (runtimeStatus === "systemError") return "error";
-  if (runtimeStatus === "idle" || runtimeStatus === "notLoaded") {
-    return "idle";
+  if (runtimeStatus === "active") return "working";
+  if (collabStatus) {
+    if (["pendingInit", "running"].includes(collabStatus)) {
+      return "working";
+    }
+    if (["interrupted", "errored"].includes(collabStatus)) {
+      return "error";
+    }
+    if (["completed", "shutdown"].includes(collabStatus)) {
+      return "idle";
+    }
+    return "unavailable";
   }
+  if (runtimeStatus === "idle") return "idle";
   return "unavailable";
+}
+
+function isCodexCollabAgentStatus(
+  value: unknown
+): value is CodexCollabAgentStatus {
+  return (
+    typeof value === "string" &&
+    [
+      "pendingInit",
+      "running",
+      "interrupted",
+      "completed",
+      "errored",
+      "shutdown",
+      "notFound"
+    ].includes(value)
+  );
+}
+
+function collabStatusFromTurn(
+  status: string | undefined
+): CodexCollabAgentStatus | undefined {
+  if (status === "inProgress") return "running";
+  if (status === "completed") return "completed";
+  if (status === "interrupted") return "interrupted";
+  if (status === "failed") return "errored";
+  return undefined;
 }
 
 function subagentSpawnSource(

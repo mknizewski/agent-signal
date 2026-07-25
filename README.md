@@ -51,8 +51,11 @@ Version 0.6.1 turns the flat watch list into a configurable project workspace:
   without delaying or hiding the dashboard status;
 - larger, higher-contrast UI text, including the mobile-device dialog;
 - a refined Codex pet and hammer animation with no clipped swing;
-- a clearer Agent Signal application icon and correctly separated product name
-  in the Windows installer;
+- a new application icon based on the laptop-working robot from the promotional
+  artwork;
+- a dark, bilingual Windows installer with signal-light accents, a robot
+  sidebar, a selectable destination folder, and the correctly separated
+  **Agent Signal** product name;
 - a subtle status-colored halo around the compact traffic lights.
 
 ## Dashboard
@@ -109,7 +112,13 @@ count to the Codex summary. The whole feature can be disabled in Settings.
 
 Subagent relationships come from the explicit `subAgentThreadSpawn` metadata
 reported by the local Codex App Server. Agent Signal does not guess a parent
-from titles, paths, or timing.
+from titles, paths, or timing. Live state comes from each parent thread's
+official `collabAgentToolCall.agentsStates` map and turn lifecycle. Current
+Codex builds may persist only `subAgentActivity` items after a turn finishes,
+so the terminal parent-turn state is used as a safe fallback. `running` and
+`pendingInit` remain working, while only a confirmed terminal state becomes
+completed. A technical `notLoaded` thread state is treated as unknown, never
+as proof that the subagent finished.
 
 ## Status model
 
@@ -145,8 +154,11 @@ sessions, plus a per-provider summary and Codex subagent activity when present.
 Each signal has a restrained colored halo so its state remains legible without
 overpowering a dark desktop. The synchronization footer uses a larger,
 integer-sized font weight and size so it stays crisp at native Windows scaling.
+Compact mode also removes the File and View menus from its title bar, leaving
+more room for the signals. A dedicated Exit button sits beside the light/dark
+theme control, so the app can be stopped without expanding the dashboard.
 
-![Agent Signal compact mode with illuminated traffic lights](docs/screenshots/compact-dark-0.6.1.png)
+![Agent Signal compact mode with illuminated traffic lights, hidden menus, and a dedicated Exit button](docs/screenshots/compact-dark-0.6.1-new.jpg)
 
 ## Pets and idle behavior
 
@@ -214,7 +226,18 @@ take the mobile dashboard offline.
 
 1. Open the [latest Agent Signal release](https://github.com/mknizewski/agent-signal/releases/latest).
 2. Download `Agent Signal Setup <version>.exe`.
-3. Run the installer and choose the installation directory.
+3. Run the installer, choose whether Agent Signal is available to you or to all
+   users, and select the installation directory.
+
+The assisted installer follows the app rather than the default Windows wizard:
+it uses the same dark palette, red/amber/green signal accents, and the Agent
+Signal robot. It detects Polish or English from Windows and uses interface copy
+written naturally for each language.
+
+<p align="center">
+  <img src="docs/screenshots/installer-dark-0.6.1.jpg" width="48%" alt="Dark Agent Signal installer welcome screen with robot artwork" />
+  <img src="docs/screenshots/installer-directory-dark-0.6.1.jpg" width="48%" alt="Dark Agent Signal installer destination folder screen" />
+</p>
 
 The product name is displayed as **Agent Signal** throughout the installer,
 Start menu, desktop shortcut, and installed-app list. Version 0.6.1 targets

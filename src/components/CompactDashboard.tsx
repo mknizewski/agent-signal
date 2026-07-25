@@ -1,5 +1,6 @@
 import {
   Moon,
+  Power,
   RefreshCw,
   Sun
 } from "lucide-react";
@@ -26,6 +27,7 @@ interface CompactDashboardProps {
   preferences: AppPreferences;
   onRefresh(): void;
   onThemeToggle(): void;
+  onExit(): void;
 }
 
 const signalStatuses: SessionStatus[] = [
@@ -43,7 +45,8 @@ export function CompactDashboard({
   now,
   preferences,
   onRefresh,
-  onThemeToggle
+  onThemeToggle,
+  onExit
 }: CompactDashboardProps) {
   const copy = copyFor(preferences.language);
   const headline = compactHeadline(
@@ -80,6 +83,15 @@ export function CompactDashboard({
             onClick={onThemeToggle}
           >
             {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
+          <button
+            className="icon-button compact-exit"
+            type="button"
+            title={copy.titlebar.exit}
+            aria-label={copy.titlebar.exit}
+            onClick={onExit}
+          >
+            <Power size={15} />
           </button>
           <button
             className="icon-button"

@@ -8,11 +8,13 @@ import type {
   SessionSubagent
 } from "../../src/shared/types";
 import {
+  extractCodexCollabStatuses,
   isCodexSubagentThread,
   mapCodexSubagent,
   mapClaudeSession,
   mapCodexThread,
   type ClaudeExternalSession,
+  type CodexCollabAgentStatus,
   type CodexExternalThread
 } from "../../src/shared/external-sessions";
 import { CodexSessionLogTracker } from "./codex-session-log";
@@ -137,15 +139,37 @@ export class ExternalSessionSync {
         this.codexClient.listThreads(CODEX_SOURCE_KINDS),
         this.codexClient.listSubagentThreads()
       ]);
+      const trackedThreadIds =
+        this.options.getTrackedCodexThreadIds();
       const enrichedThreads = await this.codexLogs.enrich(
         threads.filter((thread) => !isCodexSubagentThread(thread)),
-        this.options.getTrackedCodexThreadIds()
+        trackedThreadIds
       );
       this.codexSessions = enrichedThreads.map((thread) =>
         mapCodexThread(thread)
       );
-      this.codexSubagents = subagentThreads
+      const initialSubagents = subagentThreads
         .map((thread) => mapCodexSubagent(thread))
+        .filter(
+          (subagent): subagent is SessionSubagent => Boolean(subagent)
+        );
+      const trackedParentIds = new Set(trackedThreadIds);
+      const collabStatuses =
+        await this.codexClient.readCollabAgentStatuses(
+          initialSubagents
+            .filter((subagent) =>
+              trackedParentIds.has(subagent.parentThreadId)
+            )
+            .map((subagent) => subagent.parentThreadId)
+        );
+      this.codexSubagents = subagentThreads
+        .map((thread) =>
+          mapCodexSubagent(
+            thread,
+            new Date(),
+            collabStatuses.get(thread.id)
+          )
+        )
         .filter(
           (subagent): subagent is SessionSubagent => Boolean(subagent)
         );
@@ -201,6 +225,35 @@ class CodexHistoryClient {
       // Older App Server versions do not recognize subagent source filters.
       return [];
     }
+  }
+
+  async readCollabAgentStatuses(
+    parentThreadIds: string[]
+  ): Promise<Map<string, CodexCollabAgentStatus>> {
+    const result = new Map<string, CodexCollabAgentStatus>();
+    const uniqueParentIds = [...new Set(parentThreadIds)];
+    const responses = await Promise.allSettled(
+      uniqueParentIds.map((threadId) =>
+        this.request("thread/read", {
+          threadId,
+          includeTurns: true
+        })
+      )
+    );
+
+    for (const response of responses) {
+      if (response.status !== "fulfilled") continue;
+      const payload = response.value as {
+        thread?: CodexExternalThread;
+      };
+      if (!payload.thread) continue;
+      for (const [threadId, status] of extractCodexCollabStatuses(
+        payload.thread
+      )) {
+        result.set(threadId, status);
+      }
+    }
+    return result;
   }
 
   async listThreads(
