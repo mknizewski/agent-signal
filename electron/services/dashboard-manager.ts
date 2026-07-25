@@ -4,8 +4,11 @@ import type {
   ArchivedSessionRecord,
   DiscoveredSession,
   ProviderStatus,
+  ProjectGroupConfig,
+  ReorderProjectGroupsInput,
   TrackSessionsInput,
   TrackedSessionRecord,
+  UpdateProjectGroupInput,
   UpdateTrackedSessionInput
 } from "../../src/shared/types";
 import {
@@ -13,6 +16,7 @@ import {
   normalizePreferences,
   projectNameFromPath
 } from "../../src/shared/preferences";
+import { normalizeProjectGroupConfigs } from "../../src/shared/project-groups";
 import {
   createArchivedSessionRecord,
   createTrackingRecord,
@@ -29,6 +33,7 @@ export class DashboardManager {
   private archivedRecords: ArchivedSessionRecord[] = [];
   private catalog: DiscoveredSession[] = [];
   private preferences: AppPreferences = DEFAULT_PREFERENCES;
+  private projectGroups: ProjectGroupConfig[] = [];
   private pendingSessionPrompts = new Set<string>();
   private knownCatalogIds = new Set<string>();
   private catalogInitialized = false;
@@ -46,6 +51,7 @@ export class DashboardManager {
     this.records = state.trackedSessions;
     this.archivedRecords = state.archivedSessions;
     this.preferences = normalizePreferences(state.preferences);
+    this.projectGroups = normalizeProjectGroupConfigs(state.projectGroups);
     this.providers = detectProviders();
     this.emit();
     this.startExternalSync();
@@ -69,6 +75,7 @@ export class DashboardManager {
         claude: publicProviderStatus(this.providers.claude)
       },
       preferences: this.preferences,
+      projectGroups: this.projectGroups.map((group) => ({ ...group })),
       pendingSessionPrompts: [...this.pendingSessionPrompts].filter((id) =>
         this.catalog.some((session) => session.id === id)
       ),
@@ -198,6 +205,64 @@ export class DashboardManager {
     return this.getSnapshot();
   }
 
+  updateProjectGroup(input: UpdateProjectGroupInput): AppSnapshot {
+    const existing = this.projectGroups.find(
+      (group) => group.projectKey === input.projectKey
+    );
+    const maxOrder = this.projectGroups.reduce(
+      (highest, group) => Math.max(highest, group.order),
+      -1
+    );
+    const next: ProjectGroupConfig = {
+      projectKey: input.projectKey,
+      order: existing?.order ?? maxOrder + 1,
+      ...(input.label.trim()
+        ? { label: input.label.trim().slice(0, 80) }
+        : {}),
+      ...(input.symbol.trim()
+        ? {
+            symbol: [...input.symbol.trim()].slice(0, 2).join("")
+          }
+        : {}),
+      ...(input.color.trim()
+        ? { color: input.color.trim().toLowerCase() }
+        : {})
+    };
+    this.projectGroups = normalizeProjectGroupConfigs([
+      ...this.projectGroups.filter(
+        (group) => group.projectKey !== input.projectKey
+      ),
+      next
+    ]);
+    this.persistAndEmit();
+    return this.getSnapshot();
+  }
+
+  reorderProjectGroups(input: ReorderProjectGroupsInput): AppSnapshot {
+    const existing = new Map(
+      this.projectGroups.map((group) => [group.projectKey, group])
+    );
+    const orderedKeys = [...new Set(input.projectKeys)];
+    const orderedSet = new Set(orderedKeys);
+    const reordered = orderedKeys.map((projectKey, order) => ({
+      ...(existing.get(projectKey) ?? { projectKey }),
+      order
+    }));
+    const remaining = this.projectGroups
+      .filter((group) => !orderedSet.has(group.projectKey))
+      .sort((left, right) => left.order - right.order)
+      .map((group, index) => ({
+        ...group,
+        order: orderedKeys.length + index
+      }));
+    this.projectGroups = normalizeProjectGroupConfigs([
+      ...reordered,
+      ...remaining
+    ]);
+    this.persistAndEmit();
+    return this.getSnapshot();
+  }
+
   dismissSessionPrompt(sessionId: string): AppSnapshot {
     this.pendingSessionPrompts.delete(sessionId);
     this.emit();
@@ -274,12 +339,14 @@ export class DashboardManager {
     const archivedRecords = this.archivedRecords.map((record) => ({
       ...record
     }));
+    const projectGroups = this.projectGroups.map((group) => ({ ...group }));
     this.saveQueue = this.saveQueue
       .then(() =>
         this.store.save({
           trackedSessions: records,
           archivedSessions: archivedRecords,
-          preferences: this.preferences
+          preferences: this.preferences,
+          projectGroups
         })
       )
       .catch((error) => {

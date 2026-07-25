@@ -82,6 +82,18 @@ let demoSnapshot: AppSnapshot = {
     }
   },
   preferences: DEFAULT_PREFERENCES,
+  projectGroups: [
+    {
+      projectKey: "customer-portal",
+      color: "#8d6bc5",
+      order: 0
+    },
+    {
+      projectKey: "checkout-service",
+      color: "#2d9f75",
+      order: 1
+    }
+  ],
   pendingSessionPrompts: ["codex:demo-5"],
   trackedSessions: demoCatalog.slice(0, 3).map((item) => ({
     ...item,
@@ -217,6 +229,42 @@ const demoApi: AgentSignalApi = {
     demoSnapshot = {
       ...demoSnapshot,
       preferences: { ...demoSnapshot.preferences, ...patch }
+    };
+    emitDemo();
+    return demoSnapshot;
+  },
+  updateProjectGroup: async (input) => {
+    const existing = demoSnapshot.projectGroups.find(
+      (group) => group.projectKey === input.projectKey
+    );
+    demoSnapshot = {
+      ...demoSnapshot,
+      projectGroups: [
+        ...demoSnapshot.projectGroups.filter(
+          (group) => group.projectKey !== input.projectKey
+        ),
+        {
+          projectKey: input.projectKey,
+          order: existing?.order ?? demoSnapshot.projectGroups.length,
+          ...(input.label.trim() ? { label: input.label.trim() } : {}),
+          ...(input.symbol.trim() ? { symbol: input.symbol.trim() } : {}),
+          ...(input.color ? { color: input.color } : {})
+        }
+      ]
+    };
+    emitDemo();
+    return demoSnapshot;
+  },
+  reorderProjectGroups: async (input) => {
+    const existing = new Map(
+      demoSnapshot.projectGroups.map((group) => [group.projectKey, group])
+    );
+    demoSnapshot = {
+      ...demoSnapshot,
+      projectGroups: input.projectKeys.map((projectKey, order) => ({
+        ...(existing.get(projectKey) ?? { projectKey }),
+        order
+      }))
     };
     emitDemo();
     return demoSnapshot;

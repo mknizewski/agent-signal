@@ -43,6 +43,7 @@ const snapshot: AppSnapshot = {
     }
   },
   preferences: DEFAULT_PREFERENCES,
+  projectGroups: [],
   pendingSessionPrompts: [],
   updatedAt: "2026-07-25T10:01:01.000Z"
 };

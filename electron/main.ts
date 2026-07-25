@@ -15,10 +15,13 @@ import type {
   AppPreferences,
   AppSnapshot,
   MobileGatewayStatus,
+  ReorderProjectGroupsInput,
   SessionStatus,
   TrackSessionsInput,
+  UpdateProjectGroupInput,
   UpdateTrackedSessionInput
 } from "../src/shared/types";
+import { isProjectColor } from "../src/shared/project-groups";
 import { DashboardManager } from "./services/dashboard-manager";
 import { MobileGateway } from "./services/mobile-gateway";
 import { MobileStore } from "./services/mobile-store";
@@ -249,6 +252,14 @@ function registerIpc(): void {
   );
   ipcMain.handle("preferences:update", (_event, patch: unknown) =>
     requireManager().updatePreferences(parsePreferencesPatch(patch))
+  );
+  ipcMain.handle("project-groups:update", (_event, input: unknown) =>
+    requireManager().updateProjectGroup(parseUpdateProjectGroupInput(input))
+  );
+  ipcMain.handle("project-groups:reorder", (_event, input: unknown) =>
+    requireManager().reorderProjectGroups(
+      parseReorderProjectGroupsInput(input)
+    )
   );
   ipcMain.handle("sessions:dismiss-prompt", (_event, sessionId: unknown) =>
     requireManager().dismissSessionPrompt(parseSessionId(sessionId))
@@ -594,4 +605,50 @@ function parsePreferencesPatch(input: unknown): Partial<AppPreferences> {
     result.idleAfterMinutes = candidate.idleAfterMinutes;
   }
   return result;
+}
+
+function parseUpdateProjectGroupInput(
+  input: unknown
+): UpdateProjectGroupInput {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new TypeError("Nieprawidłowa aktualizacja grupy.");
+  }
+  const candidate = input as Record<string, unknown>;
+  if (
+    typeof candidate.projectKey !== "string" ||
+    candidate.projectKey.length > 80 ||
+    typeof candidate.label !== "string" ||
+    candidate.label.length > 80 ||
+    typeof candidate.symbol !== "string" ||
+    [...candidate.symbol.trim()].length > 2 ||
+    typeof candidate.color !== "string" ||
+    (candidate.color !== "" && !isProjectColor(candidate.color))
+  ) {
+    throw new TypeError("Nieprawidłowe dane grupy projektu.");
+  }
+  return {
+    projectKey: candidate.projectKey,
+    label: candidate.label,
+    symbol: candidate.symbol,
+    color: candidate.color
+  };
+}
+
+function parseReorderProjectGroupsInput(
+  input: unknown
+): ReorderProjectGroupsInput {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new TypeError("Nieprawidłowa kolejność grup.");
+  }
+  const projectKeys = (input as { projectKeys?: unknown }).projectKeys;
+  if (
+    !Array.isArray(projectKeys) ||
+    projectKeys.length > 200 ||
+    projectKeys.some(
+      (key) => typeof key !== "string" || key.length > 80
+    )
+  ) {
+    throw new TypeError("Nieprawidłowa kolejność grup.");
+  }
+  return { projectKeys: [...new Set(projectKeys)] };
 }

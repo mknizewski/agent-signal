@@ -3,7 +3,9 @@ import type {
   AgentSignalApi,
   AppPreferences,
   AppSnapshot,
+  ReorderProjectGroupsInput,
   TrackSessionsInput,
+  UpdateProjectGroupInput,
   UpdateTrackedSessionInput
 } from "../src/shared/types";
 
@@ -21,6 +23,10 @@ const api: AgentSignalApi = {
     ipcRenderer.invoke("sessions:update", input),
   updatePreferences: (patch: Partial<AppPreferences>) =>
     ipcRenderer.invoke("preferences:update", patch),
+  updateProjectGroup: (input: UpdateProjectGroupInput) =>
+    ipcRenderer.invoke("project-groups:update", input),
+  reorderProjectGroups: (input: ReorderProjectGroupsInput) =>
+    ipcRenderer.invoke("project-groups:reorder", input),
   dismissSessionPrompt: (sessionId: string) =>
     ipcRenderer.invoke("sessions:dismiss-prompt", sessionId),
   openSession: (sessionId: string) =>

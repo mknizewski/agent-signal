@@ -3,6 +3,7 @@ import path from "node:path";
 import type {
   AppPreferences,
   ArchivedSessionRecord,
+  ProjectGroupConfig,
   TrackingState,
   TrackedSessionRecord
 } from "../../src/shared/types";
@@ -11,6 +12,7 @@ import {
   normalizePreferences,
   projectNameFromPath
 } from "../../src/shared/preferences";
+import { normalizeProjectGroupConfigs } from "../../src/shared/project-groups";
 
 interface StoredStateV2 {
   version: 2;
@@ -30,6 +32,14 @@ interface StoredStateV4 {
   preferences: AppPreferences;
 }
 
+interface StoredStateV5 {
+  version: 5;
+  trackedSessions: TrackedSessionRecord[];
+  archivedSessions: ArchivedSessionRecord[];
+  preferences: AppPreferences;
+  projectGroups: ProjectGroupConfig[];
+}
+
 export class TrackingStore {
   private readonly filePath: string;
 
@@ -41,7 +51,7 @@ export class TrackingStore {
     try {
       const raw = await readFile(this.filePath, "utf8");
       const parsed = JSON.parse(raw) as Partial<
-        StoredStateV2 | StoredStateV3 | StoredStateV4
+        StoredStateV2 | StoredStateV3 | StoredStateV4 | StoredStateV5
       >;
       if (!Array.isArray(parsed.trackedSessions)) {
         return emptyState();
@@ -50,14 +60,16 @@ export class TrackingStore {
         return {
           trackedSessions: normalizeRecords(parsed.trackedSessions),
           archivedSessions: [],
-          preferences: DEFAULT_PREFERENCES
+          preferences: DEFAULT_PREFERENCES,
+          projectGroups: []
         };
       }
       if (parsed.version === 3 && Array.isArray(parsed.archivedSessions)) {
         return {
           trackedSessions: normalizeRecords(parsed.trackedSessions),
           archivedSessions: normalizeArchivedRecords(parsed.archivedSessions),
-          preferences: DEFAULT_PREFERENCES
+          preferences: DEFAULT_PREFERENCES,
+          projectGroups: []
         };
       }
       if (
@@ -67,7 +79,19 @@ export class TrackingStore {
         return {
           trackedSessions: normalizeRecords(parsed.trackedSessions),
           archivedSessions: normalizeArchivedRecords(parsed.archivedSessions),
-          preferences: normalizePreferences(parsed.preferences)
+          preferences: normalizePreferences(parsed.preferences),
+          projectGroups: []
+        };
+      }
+      if (
+        parsed.version === 5 &&
+        Array.isArray(parsed.archivedSessions)
+      ) {
+        return {
+          trackedSessions: normalizeRecords(parsed.trackedSessions),
+          archivedSessions: normalizeArchivedRecords(parsed.archivedSessions),
+          preferences: normalizePreferences(parsed.preferences),
+          projectGroups: normalizeProjectGroupConfigs(parsed.projectGroups)
         };
       }
       return emptyState();
@@ -79,11 +103,12 @@ export class TrackingStore {
   async save(state: TrackingState): Promise<void> {
     await mkdir(path.dirname(this.filePath), { recursive: true });
     const temporaryPath = `${this.filePath}.tmp`;
-    const storedState: StoredStateV4 = {
-      version: 4,
+    const storedState: StoredStateV5 = {
+      version: 5,
       trackedSessions: state.trackedSessions,
       archivedSessions: state.archivedSessions,
-      preferences: normalizePreferences(state.preferences)
+      preferences: normalizePreferences(state.preferences),
+      projectGroups: normalizeProjectGroupConfigs(state.projectGroups)
     };
     await writeFile(
       temporaryPath,
@@ -98,7 +123,8 @@ function emptyState(): TrackingState {
   return {
     trackedSessions: [],
     archivedSessions: [],
-    preferences: DEFAULT_PREFERENCES
+    preferences: DEFAULT_PREFERENCES,
+    projectGroups: []
   };
 }
 

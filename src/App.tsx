@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties
+} from "react";
 import {
   AlertCircle,
   Archive,
@@ -17,12 +23,14 @@ import {
 import { agentApi, isDemoMode } from "./lib/api";
 import { copyFor, localizeRuntimeText } from "./lib/i18n";
 import { DEFAULT_PREFERENCES } from "./shared/preferences";
+import { groupSessionsByProject } from "./shared/project-groups";
 import type {
   AgentKind,
   AppPreferences,
   AppSnapshot,
   SessionStatus,
-  TrackedSession
+  TrackedSession,
+  UpdateProjectGroupInput
 } from "./shared/types";
 import {
   SIGNAL_ORDER,
@@ -36,6 +44,7 @@ import { ChatPickerModal } from "./components/ChatPickerModal";
 import { CompactDashboard } from "./components/CompactDashboard";
 import { MobileDevicesModal } from "./components/MobileDevicesModal";
 import { NewSessionPrompt } from "./components/NewSessionPrompt";
+import { ProjectGroupHeader } from "./components/ProjectGroupHeader";
 import { SettingsView } from "./components/SettingsView";
 import { TrackedChatRow } from "./components/TrackedChatRow";
 
@@ -69,6 +78,7 @@ const emptySnapshot: AppSnapshot = {
     }
   },
   preferences: DEFAULT_PREFERENCES,
+  projectGroups: [],
   pendingSessionPrompts: [],
   updatedAt: new Date().toISOString()
 };
@@ -82,6 +92,14 @@ export default function App() {
   const [now, setNow] = useState(new Date());
   const [toast, setToast] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [draggedProjectKey, setDraggedProjectKey] = useState<string | null>(
+    null
+  );
+  const [projectDropTargetKey, setProjectDropTargetKey] = useState<
+    string | null
+  >(null);
+  const draggedProjectKeyRef = useRef<string | null>(null);
+  const hoveredProjectKeyRef = useRef<string | null>(null);
   const [theme, setTheme] = useState<Theme>(() =>
     window.localStorage.getItem("agent-signal-theme") === "light"
       ? "light"
@@ -166,13 +184,15 @@ export default function App() {
 
   const visibleGroups = useMemo(
     () =>
-      groupSessions(
+      groupSessionsByProject(
         visibleSessions,
         snapshot.preferences.groupTrackedByProject,
-        copy.common.noProject
+        copy.common.noProject,
+        snapshot.projectGroups
       ),
     [
       copy.common.noProject,
+      snapshot.projectGroups,
       snapshot.preferences.groupTrackedByProject,
       visibleSessions
     ]
@@ -180,14 +200,31 @@ export default function App() {
 
   const sidebarGroups = useMemo(
     () =>
-      groupSessions(
+      groupSessionsByProject(
         [...snapshot.trackedSessions].sort(compareSessions),
         snapshot.preferences.groupTrackedByProject,
-        copy.common.noProject
+        copy.common.noProject,
+        snapshot.projectGroups
       ),
     [
       copy.common.noProject,
+      snapshot.projectGroups,
       snapshot.preferences.groupTrackedByProject,
+      snapshot.trackedSessions
+    ]
+  );
+
+  const allProjectGroups = useMemo(
+    () =>
+      groupSessionsByProject(
+        [...snapshot.trackedSessions].sort(compareSessions),
+        true,
+        copy.common.noProject,
+        snapshot.projectGroups
+      ),
+    [
+      copy.common.noProject,
+      snapshot.projectGroups,
       snapshot.trackedSessions
     ]
   );
@@ -305,6 +342,97 @@ export default function App() {
       showError(error);
     }
   };
+
+  const updateProjectGroup = async (input: UpdateProjectGroupInput) => {
+    try {
+      setSnapshot(await agentApi.updateProjectGroup(input));
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const startProjectDrag = (projectKey: string) => {
+    draggedProjectKeyRef.current = projectKey;
+    hoveredProjectKeyRef.current = projectKey;
+    setDraggedProjectKey(projectKey);
+    setProjectDropTargetKey(projectKey);
+  };
+
+  const reorderProjectBefore = async (
+    sourceProjectKey: string,
+    targetProjectKey: string
+  ) => {
+    const projectKeys = allProjectGroups.map((group) => group.key);
+    const withoutSource = projectKeys.filter(
+      (projectKey) => projectKey !== sourceProjectKey
+    );
+    const targetIndex = withoutSource.indexOf(targetProjectKey);
+    if (targetIndex < 0) return;
+    withoutSource.splice(targetIndex, 0, sourceProjectKey);
+    try {
+      setSnapshot(
+        await agentApi.reorderProjectGroups({
+          projectKeys: withoutSource
+        })
+      );
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const hoverProjectDrag = (projectKey: string) => {
+    const sourceProjectKey = draggedProjectKeyRef.current;
+    if (
+      !sourceProjectKey ||
+      hoveredProjectKeyRef.current === projectKey
+    ) {
+      return;
+    }
+    hoveredProjectKeyRef.current = projectKey;
+    setProjectDropTargetKey(projectKey);
+  };
+
+  const dropProject = (targetProjectKey: string) => {
+    const sourceProjectKey = draggedProjectKeyRef.current;
+    const hoveredProjectKey =
+      hoveredProjectKeyRef.current || targetProjectKey;
+    if (sourceProjectKey && hoveredProjectKey !== sourceProjectKey) {
+      void reorderProjectBefore(sourceProjectKey, hoveredProjectKey);
+    }
+    draggedProjectKeyRef.current = null;
+    hoveredProjectKeyRef.current = null;
+    setDraggedProjectKey(null);
+    setProjectDropTargetKey(null);
+  };
+
+  useEffect(() => {
+    const projectKeyAt = (clientX: number, clientY: number) =>
+      document
+        .elementFromPoint(clientX, clientY)
+        ?.closest<HTMLElement>("[data-project-key]")?.dataset.projectKey;
+
+    const handleMouseMove = (event: MouseEvent) => {
+      if (!draggedProjectKeyRef.current) return;
+      const projectKey = projectKeyAt(event.clientX, event.clientY);
+      if (projectKey) hoverProjectDrag(projectKey);
+    };
+
+    const handleMouseUp = (event: MouseEvent) => {
+      if (!draggedProjectKeyRef.current) return;
+      const projectKey =
+        projectKeyAt(event.clientX, event.clientY) ||
+        hoveredProjectKeyRef.current ||
+        draggedProjectKeyRef.current;
+      dropProject(projectKey);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  });
 
   const observePromptedSession = async (sessionId: string) => {
     try {
@@ -463,10 +591,21 @@ export default function App() {
                   sidebarGroups.map((group) => (
                     <div
                       className="sidebar-watched__group"
-                      key={group.name}
+                      key={group.key}
                     >
                       {snapshot.preferences.groupTrackedByProject && (
-                        <small>{group.name}</small>
+                        <small>
+                          <i
+                            style={
+                              {
+                                "--project-color": group.color
+                              } as CSSProperties
+                            }
+                          >
+                            {group.symbol}
+                          </i>
+                          <span>{group.name}</span>
+                        </small>
                       )}
                       {group.sessions.map((session) => (
                         <button
@@ -704,18 +843,30 @@ export default function App() {
                   {visibleGroups.map((group) => (
                     <section
                       className="project-group"
-                      key={group.name}
+                      key={group.key}
                     >
                       {snapshot.preferences.groupTrackedByProject && (
-                        <header className="project-group__header">
-                          <div>
-                            <span className="project-group__icon">
-                              {group.name.slice(0, 1).toUpperCase()}
-                            </span>
-                            <strong>{group.name}</strong>
-                          </div>
-                          <span>{group.sessions.length}</span>
-                        </header>
+                        <ProjectGroupHeader
+                          group={group}
+                          count={group.sessions.length}
+                          language={snapshot.preferences.language}
+                          draggable={allProjectGroups.length > 1}
+                          dragging={draggedProjectKey === group.key}
+                          dropTarget={
+                            draggedProjectKey !== null &&
+                            projectDropTargetKey === group.key
+                          }
+                          onUpdate={updateProjectGroup}
+                          onPointerStart={startProjectDrag}
+                          onPointerHover={hoverProjectDrag}
+                          onPointerDrop={dropProject}
+                          onPointerCancel={() => {
+                            draggedProjectKeyRef.current = null;
+                            hoveredProjectKeyRef.current = null;
+                            setDraggedProjectKey(null);
+                            setProjectDropTargetKey(null);
+                          }}
+                        />
                       )}
                       <div className="chat-list">
                         <div className="chat-list__header">
@@ -781,6 +932,7 @@ export default function App() {
         sessions={snapshot.availableSessions}
         providers={snapshot.providers}
         preferences={snapshot.preferences}
+        projectGroups={snapshot.projectGroups}
         onClose={() => setPickerOpen(false)}
         onAdd={addSessions}
       />
@@ -943,22 +1095,6 @@ function compareSessions(left: TrackedSession, right: TrackedSession): number {
     new Date(right.updatedAt).getTime() -
     new Date(left.updatedAt).getTime()
   );
-}
-
-function groupSessions(
-  sessions: TrackedSession[],
-  grouped: boolean,
-  noProjectLabel: string
-): Array<{ name: string; sessions: TrackedSession[] }> {
-  if (!grouped) return [{ name: "all", sessions }];
-  const groups = new Map<string, TrackedSession[]>();
-  for (const session of sessions) {
-    const name = session.projectName || noProjectLabel;
-    groups.set(name, [...(groups.get(name) ?? []), session]);
-  }
-  return [...groups.entries()]
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([name, entries]) => ({ name, sessions: entries }));
 }
 
 function countLabel(

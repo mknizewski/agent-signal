@@ -85,6 +85,17 @@ const translations = {
       delete: "Usuń z archiwum",
       archived: "Zarchiwizowano"
     },
+    groups: {
+      edit: "Edytuj grupę",
+      drag: "Przeciągnij, aby zmienić kolejność",
+      name: "Nazwa grupy",
+      namePlaceholder: "Własna nazwa",
+      symbol: "Litera",
+      symbolPlaceholder: "Np. P",
+      color: "Kolor",
+      save: "Zapisz",
+      reset: "Użyj automatycznych"
+    },
     prompt: {
       eyebrow: "Nowy czat",
       title: "Obserwować tę sesję?",
@@ -294,6 +305,17 @@ const translations = {
       restore: "Restore to watched chats",
       delete: "Remove from archive",
       archived: "Archived"
+    },
+    groups: {
+      edit: "Edit group",
+      drag: "Drag to reorder",
+      name: "Group name",
+      namePlaceholder: "Custom name",
+      symbol: "Letter",
+      symbolPlaceholder: "For example, P",
+      color: "Color",
+      save: "Save",
+      reset: "Use automatic values"
     },
     prompt: {
       eyebrow: "New chat",

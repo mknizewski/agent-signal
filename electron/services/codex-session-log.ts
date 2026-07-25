@@ -7,7 +7,6 @@ export interface CodexLogState {
   activity: CodexLogActivity;
   activeTurnId?: string;
   pendingAttentionCallIds?: string[];
-  approvalPendingLikely?: boolean;
 }
 
 interface CachedLogState extends CodexLogState {
@@ -62,11 +61,11 @@ export class CodexSessionLogTracker {
         };
         this.consume(initial, data.toString("utf8"));
         this.states.set(thread.id, initial);
-        return inferCodexLogActivity(initial, fileStats.mtimeMs);
+        return initial.activity;
       }
 
       if (fileStats.size === previous.offset) {
-        return inferCodexLogActivity(previous, fileStats.mtimeMs);
+        return previous.activity;
       }
 
       const length = fileStats.size - previous.offset;
@@ -89,7 +88,7 @@ export class CodexSessionLogTracker {
       }
       previous.offset += bytesRead;
       this.consume(previous, data.subarray(0, bytesRead).toString("utf8"));
-      return inferCodexLogActivity(previous, fileStats.mtimeMs);
+      return previous.activity;
     } catch {
       return previous?.activity ?? "unknown";
     }
@@ -106,11 +105,6 @@ export class CodexSessionLogTracker {
       state.pendingAttentionCallIds = next.pendingAttentionCallIds;
     } else {
       delete state.pendingAttentionCallIds;
-    }
-    if (next.approvalPendingLikely) {
-      state.approvalPendingLikely = true;
-    } else {
-      delete state.approvalPendingLikely;
     }
   }
 }
@@ -130,8 +124,7 @@ export function reduceCodexLogLines(
       !line.includes('"function_call_output"') &&
       !line.includes('"custom_tool_call"') &&
       !line.includes('"custom_tool_call_output"') &&
-      !line.includes('"reasoning"') &&
-      !line.includes('"message"')
+      !line.includes('"reasoning"')
     ) {
       continue;
     }
@@ -155,7 +148,6 @@ export function reduceCodexLogLines(
         state.activity = "working";
         state.activeTurnId = turnId;
         delete state.pendingAttentionCallIds;
-        delete state.approvalPendingLikely;
       } else if (
         entry.type === "event_msg" &&
         (eventType === "task_complete" || eventType === "turn_aborted")
@@ -164,7 +156,6 @@ export function reduceCodexLogLines(
           state.activity = "idle";
           state.activeTurnId = undefined;
           delete state.pendingAttentionCallIds;
-          delete state.approvalPendingLikely;
         }
       } else if (
         entry.type === "response_item" &&
@@ -176,7 +167,6 @@ export function reduceCodexLogLines(
         pending.add(callId);
         state.pendingAttentionCallIds = [...pending];
         state.activity = "attention";
-        delete state.approvalPendingLikely;
       } else if (
         entry.type === "response_item" &&
         isCallOutput(eventType)
@@ -195,20 +185,6 @@ export function reduceCodexLogLines(
           delete state.pendingAttentionCallIds;
           state.activity = state.activeTurnId ? "working" : "unknown";
         }
-        delete state.approvalPendingLikely;
-      } else if (
-        entry.type === "response_item" &&
-        eventType === "reasoning" &&
-        state.activeTurnId
-      ) {
-        state.approvalPendingLikely = true;
-      } else if (
-        entry.type === "response_item" &&
-        (eventType === "function_call" ||
-          eventType === "custom_tool_call" ||
-          eventType === "message")
-      ) {
-        delete state.approvalPendingLikely;
       }
     } catch {
       // A concurrently written partial JSONL record is retried on the next pass.
@@ -216,22 +192,6 @@ export function reduceCodexLogLines(
   }
 
   return state;
-}
-
-export function inferCodexLogActivity(
-  state: CodexLogState,
-  lastLogWriteAt: number,
-  now = Date.now()
-): CodexLogActivity {
-  if (
-    state.activity === "working" &&
-    state.activeTurnId &&
-    state.approvalPendingLikely &&
-    now - lastLogWriteAt >= 8_000
-  ) {
-    return "attention";
-  }
-  return state.activity;
 }
 
 function isInteractiveCall(

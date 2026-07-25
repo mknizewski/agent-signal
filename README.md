@@ -29,6 +29,8 @@ dashboard.
 
 - Track selected Codex and Claude Code sessions in one place.
 - Group watched chats by project, with optional automatic project detection.
+- Rename project groups, choose their badge letters and colors, and arrange
+  them in a personal drag-and-drop order.
 - Pin important chats and keep them at the top of each project.
 - Open the exact Codex conversation from its row or with a double-click.
 - Show project groups in the chat picker.
@@ -44,6 +46,8 @@ dashboard.
 - Configure language, projects, pinning, chat navigation, new-session detection,
   notifications, and idle behavior from the Settings view.
 - Switch between naturally written Polish and English interface copy.
+- Use larger, higher-contrast labels and status details throughout the desktop
+  dashboard.
 - Archive completed items, restore them later, or remove them from the
   dashboard archive.
 - Light and dark themes.
@@ -140,11 +144,11 @@ conversations, Agent Signal also reads `task_started`, `task_complete`, and
 `turn_aborted` events from the local JSONL history. Pending
 `request_user_input` calls and commands requesting elevated permission are
 tracked until their matching response, so approval prompts switch the session
-to **Approval needed**. If the last active Codex log entry is reasoning and no
-follow-up event arrives after a short grace period, Agent Signal treats it as
-a host-level approval prompt; these prompts are not written to the
-conversation log before the user responds. Explicit task events keep
-long-running work marked as active even when the log is briefly quiet.
+to **Approval needed**. App Server `waitingOnApproval` and
+`waitingOnUserInput` flags are also treated as explicit attention signals.
+Reasoning activity or a quiet log alone never changes a working session into
+an approval wait, which avoids leaving active chats incorrectly stuck in the
+yellow state.
 
 Claude Code exposes local history through the official SDK's `listSessions`
 method. Its working state is inferred from the time of the latest session

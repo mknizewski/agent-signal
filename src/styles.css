@@ -12,8 +12,8 @@
   --sidebar: #efefec;
   --sidebar-hover: #e7e7e3;
   --text: #20201e;
-  --muted: #74746f;
-  --subtle: #9a9a94;
+  --muted: #62625d;
+  --subtle: #7f7f79;
   --line: #e2e2de;
   --line-strong: #d4d4ce;
   --working: #dc474c;
@@ -1140,16 +1140,16 @@ input:focus-visible {
 
 .status-pet__work {
   z-index: 3;
-  overflow: hidden;
+  overflow: visible;
   --pet-work-offset: 0s;
   clip-path: polygon(
-    0 0,
-    100% 0,
-    100% calc(100% - var(--pet-signal-safe)),
+    -30% -30%,
+    130% -30%,
+    130% calc(100% - var(--pet-signal-safe)),
     calc(100% - var(--pet-signal-safe))
       calc(100% - var(--pet-signal-safe)),
-    calc(100% - var(--pet-signal-safe)) 100%,
-    0 100%
+    calc(100% - var(--pet-signal-safe)) 130%,
+    -30% 130%
   );
 }
 
@@ -2041,7 +2041,7 @@ input:focus-visible {
   --sidebar-hover: #252523;
   --text: #e9e9e5;
   --muted: #aaa9a3;
-  --subtle: #7f7f79;
+  --subtle: #989892;
   --line: #32322f;
   --line-strong: #41413d;
   --working: #ed5a5f;
@@ -2866,6 +2866,381 @@ html[data-compact="true"] body {
   }
 }
 
+/* Readable desktop typography and customizable project groups. */
+
+.button--ghost {
+  color: var(--muted);
+  background: transparent;
+}
+
+.button--ghost:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--canvas);
+}
+
+.project-group {
+  position: relative;
+}
+
+.project-group__header {
+  position: relative;
+  border-radius: 8px;
+  transition:
+    background 140ms ease,
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.project-group__header.is-dragging {
+  opacity: 0.42;
+  transform: scale(0.995);
+}
+
+.project-group__header.is-drop-target:not(.is-dragging) {
+  background: color-mix(in srgb, var(--project-color) 9%, transparent);
+  box-shadow: inset 3px 0 var(--project-color);
+}
+
+.project-group__header.is-editing {
+  z-index: 25;
+}
+
+.project-group__identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.project-group__drag {
+  display: grid;
+  width: 18px;
+  height: 24px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--subtle);
+  cursor: grab;
+  opacity: 0.62;
+  touch-action: none;
+  user-select: none;
+}
+
+.project-group__drag:active {
+  cursor: grabbing;
+}
+
+.project-group__header:hover .project-group__drag {
+  color: var(--muted);
+  opacity: 1;
+}
+
+.project-group__icon {
+  border-color: color-mix(in srgb, var(--project-color) 38%, var(--line));
+  color: var(--project-color);
+  background: color-mix(in srgb, var(--project-color) 11%, var(--surface));
+  font-size: 11px;
+}
+
+.project-group__edit {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 120ms ease,
+    background 120ms ease;
+}
+
+.project-group__header:hover .project-group__edit,
+.project-group__edit:focus-visible,
+.project-group__header.is-editing .project-group__edit {
+  opacity: 1;
+}
+
+.project-group__edit:hover {
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(20, 20, 18, 0.08);
+}
+
+.project-group__count {
+  min-width: 25px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(128, 128, 120, 0.12);
+  font-size: 10px;
+  font-weight: 620;
+  text-align: center;
+}
+
+.project-group-editor {
+  position: absolute;
+  z-index: 30;
+  top: 35px;
+  left: 28px;
+  display: grid;
+  width: min(520px, calc(100vw - 360px));
+  grid-template-columns: minmax(180px, 1fr) 92px 76px;
+  gap: 11px;
+  padding: 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: 0 18px 48px rgba(20, 20, 18, 0.2);
+  cursor: default;
+}
+
+.project-group-editor label {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.project-group-editor label > span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 620;
+}
+
+.project-group-editor input {
+  width: 100%;
+  height: 35px;
+  padding: 0 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  outline: 0;
+  color: var(--text);
+  background: var(--canvas);
+  font-size: 12px;
+}
+
+.project-group-editor input:focus {
+  border-color: color-mix(in srgb, var(--project-color) 62%, var(--line));
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--project-color) 13%, transparent);
+}
+
+.project-group-editor__symbol input {
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.project-group-editor__color input {
+  padding: 4px;
+  cursor: pointer;
+}
+
+.project-group-editor__actions {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  padding-top: 2px;
+}
+
+.project-group-editor__actions .button--ghost {
+  margin-right: auto;
+}
+
+.sidebar-watched__group > small {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 9.5px;
+}
+
+.sidebar-watched__group > small > i {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 5px;
+  color: var(--project-color);
+  background: color-mix(in srgb, var(--project-color) 13%, var(--sidebar));
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 750;
+}
+
+.sidebar-watched__group > small > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-project-group > header {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 7px;
+  color: var(--muted);
+}
+
+.session-project-group__icon {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 5px;
+  color: var(--project-color);
+  background: color-mix(in srgb, var(--project-color) 12%, var(--surface));
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.app-menu > button,
+.button {
+  font-size: 12px;
+}
+
+.app-menu__popover button,
+.sidebar-label,
+.status-summary small,
+.list-toolbar > span {
+  font-size: 11px;
+}
+
+.app-menu__popover kbd,
+.signal-legend small {
+  font-size: 10px;
+}
+
+.connection strong {
+  font-size: 12px;
+}
+
+.connection span,
+.signal-legend strong,
+.sidebar-watched__toggle,
+.sidebar-watched__group > button span,
+.sidebar-watched__empty {
+  font-size: 10.5px;
+}
+
+.eyebrow {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.page-header > div:first-child > span {
+  font-size: 13px;
+}
+
+.search-input input {
+  font-size: 12px;
+}
+
+.chat-list__header {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.chat-row__title strong {
+  font-size: 13px;
+}
+
+.chat-row__title span {
+  color: var(--muted);
+  font-size: 9.5px;
+}
+
+.chat-row__identity p,
+.chat-row__status span,
+.chat-row time {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.chat-row__status strong {
+  font-size: 11.5px;
+}
+
+.archive-row__date strong {
+  font-size: 10.5px;
+}
+
+.project-group__header strong {
+  font-size: 13px;
+}
+
+.session-project-group > header strong,
+.session-project-group > header span {
+  font-size: 10px;
+}
+
+.settings-card h2 {
+  font-size: 14px;
+}
+
+.settings-card header p {
+  font-size: 11px;
+}
+
+.preference-toggle strong,
+.preference-number {
+  font-size: 12px;
+}
+
+.preference-toggle small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.language-picker button {
+  font-size: 11px;
+}
+
+.settings-view__saved,
+.new-session-prompt small,
+.chat-picker__footer > span,
+.form-error,
+.toast {
+  font-size: 10px;
+}
+
+.new-session-prompt strong {
+  font-size: 13px;
+}
+
+.new-session-prompt p,
+.chat-picker__header p {
+  font-size: 11px;
+}
+
+.source-tabs button {
+  font-size: 10.5px;
+}
+
+.session-option__content strong {
+  font-size: 12px;
+}
+
+.session-option__content small,
+.session-option time,
+.picker-empty span {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+@media (max-width: 780px) {
+  .project-group-editor {
+    left: 0;
+    width: min(520px, calc(100vw - 40px));
+    grid-template-columns: minmax(150px, 1fr) 78px 66px;
+  }
+}
+
 /* Project workspaces, preferences, and source navigation */
 .app-shell {
   grid-template-columns: 252px minmax(0, 1fr);
@@ -3526,4 +3901,53 @@ html[data-compact="true"] body {
   .new-session-prompt {
     animation: none !important;
   }
+}
+
+/* Keep dense dashboard copy legible after the workspace layout rules above. */
+.project-group__header strong {
+  font-size: 13px;
+}
+
+.project-group__count,
+.project-group__header > span:last-child {
+  font-size: 10.5px;
+}
+
+.sidebar-watched__toggle,
+.sidebar-watched__group > small,
+.sidebar-watched__group > button span,
+.sidebar-watched__empty {
+  font-size: 10.5px;
+}
+
+.session-project-group > header strong,
+.session-project-group > header span {
+  font-size: 10px;
+}
+
+.chat-row__identity p,
+.chat-row__status span,
+.chat-row time {
+  font-size: 10.5px;
+}
+
+.chat-row__status strong {
+  font-size: 12px;
+}
+
+.settings-card h2 {
+  font-size: 14px;
+}
+
+.settings-card header p {
+  font-size: 11px;
+}
+
+.preference-toggle strong,
+.preference-number {
+  font-size: 12px;
+}
+
+.preference-toggle small {
+  font-size: 10.5px;
 }

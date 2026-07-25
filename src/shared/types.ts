@@ -57,6 +57,15 @@ export interface TrackingState {
   trackedSessions: TrackedSessionRecord[];
   archivedSessions: ArchivedSessionRecord[];
   preferences: AppPreferences;
+  projectGroups: ProjectGroupConfig[];
+}
+
+export interface ProjectGroupConfig {
+  projectKey: string;
+  label?: string;
+  symbol?: string;
+  color?: string;
+  order: number;
 }
 
 export interface AppPreferences {
@@ -90,6 +99,7 @@ export interface AppSnapshot {
   availableSessions: DiscoveredSession[];
   providers: Record<AgentKind, ProviderStatus>;
   preferences: AppPreferences;
+  projectGroups: ProjectGroupConfig[];
   pendingSessionPrompts: string[];
   updatedAt: string;
 }
@@ -102,6 +112,17 @@ export interface UpdateTrackedSessionInput {
   sessionId: string;
   pinned?: boolean;
   projectName?: string;
+}
+
+export interface UpdateProjectGroupInput {
+  projectKey: string;
+  label: string;
+  symbol: string;
+  color: string;
+}
+
+export interface ReorderProjectGroupsInput {
+  projectKeys: string[];
 }
 
 export interface MobileSessionSummary {
@@ -164,6 +185,10 @@ export interface AgentSignalApi {
   updateTrackedSession(input: UpdateTrackedSessionInput): Promise<AppSnapshot>;
   updatePreferences(
     patch: Partial<AppPreferences>
+  ): Promise<AppSnapshot>;
+  updateProjectGroup(input: UpdateProjectGroupInput): Promise<AppSnapshot>;
+  reorderProjectGroups(
+    input: ReorderProjectGroupsInput
   ): Promise<AppSnapshot>;
   dismissSessionPrompt(sessionId: string): Promise<AppSnapshot>;
   openSession(sessionId: string): Promise<void>;

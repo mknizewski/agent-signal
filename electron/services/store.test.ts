@@ -45,11 +45,12 @@ describe("TrackingStore", () => {
     expect(state).toEqual({
       trackedSessions: [trackedSession],
       archivedSessions: [],
-      preferences: DEFAULT_PREFERENCES
+      preferences: DEFAULT_PREFERENCES,
+      projectGroups: []
     });
   });
 
-  it("persists active, archived sessions, and preferences as version 4", async () => {
+  it("persists sessions, preferences, and project groups as version 5", async () => {
     const directory = await createTemporaryDirectory();
     const store = new TrackingStore(directory);
     const archived = {
@@ -60,7 +61,16 @@ describe("TrackingStore", () => {
     await store.save({
       trackedSessions: [],
       archivedSessions: [archived],
-      preferences: { ...DEFAULT_PREFERENCES, language: "en" }
+      preferences: { ...DEFAULT_PREFERENCES, language: "en" },
+      projectGroups: [
+        {
+          projectKey: "project",
+          label: "Payments",
+          symbol: "P",
+          color: "#6f82e8",
+          order: 0
+        }
+      ]
     });
 
     const stored = JSON.parse(
@@ -70,10 +80,19 @@ describe("TrackingStore", () => {
       )
     ) as unknown;
     expect(stored).toEqual({
-      version: 4,
+      version: 5,
       trackedSessions: [],
       archivedSessions: [archived],
-      preferences: { ...DEFAULT_PREFERENCES, language: "en" }
+      preferences: { ...DEFAULT_PREFERENCES, language: "en" },
+      projectGroups: [
+        {
+          projectKey: "project",
+          label: "Payments",
+          symbol: "P",
+          color: "#6f82e8",
+          order: 0
+        }
+      ]
     });
   });
 });

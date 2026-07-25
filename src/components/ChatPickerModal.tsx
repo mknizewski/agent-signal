@@ -1,12 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties
+} from "react";
 import { Check, Plus, Search, X } from "lucide-react";
 import type {
   AgentKind,
   AppPreferences,
   DiscoveredSession,
+  ProjectGroupConfig,
   ProviderStatus
 } from "../shared/types";
 import { formatRelativeTime } from "../shared/status";
+import { groupSessionsByProject } from "../shared/project-groups";
 import { copyFor } from "../lib/i18n";
 import { AgentMark } from "./AgentMark";
 
@@ -17,6 +24,7 @@ interface ChatPickerModalProps {
   sessions: DiscoveredSession[];
   providers: Record<AgentKind, ProviderStatus>;
   preferences: AppPreferences;
+  projectGroups: ProjectGroupConfig[];
   onClose(): void;
   onAdd(sessionIds: string[]): Promise<void>;
 }
@@ -26,6 +34,7 @@ export function ChatPickerModal({
   sessions,
   providers,
   preferences,
+  projectGroups,
   onClose,
   onAdd
 }: ChatPickerModalProps) {
@@ -62,14 +71,16 @@ export function ChatPickerModal({
   }, [query, sessions, source]);
   const sessionGroups = useMemo(
     () =>
-      groupSessions(
+      groupSessionsByProject(
         visibleSessions,
         preferences.groupPickerByProject,
-        copy.common.noProject
+        copy.common.noProject,
+        projectGroups
       ),
     [
       copy.common.noProject,
       preferences.groupPickerByProject,
+      projectGroups,
       visibleSessions
     ]
   );
@@ -169,10 +180,19 @@ export function ChatPickerModal({
             sessionGroups.map((group) => (
               <section
                 className="session-project-group"
-                key={group.name}
+                key={group.key}
               >
                 {preferences.groupPickerByProject && (
-                  <header>
+                  <header
+                    style={
+                      {
+                        "--project-color": group.color
+                      } as CSSProperties
+                    }
+                  >
+                    <span className="session-project-group__icon">
+                      {group.symbol}
+                    </span>
                     <strong>{group.name}</strong>
                     <span>{group.sessions.length}</span>
                   </header>
@@ -253,20 +273,4 @@ export function ChatPickerModal({
       </section>
     </div>
   );
-}
-
-function groupSessions(
-  sessions: DiscoveredSession[],
-  grouped: boolean,
-  noProjectLabel: string
-): Array<{ name: string; sessions: DiscoveredSession[] }> {
-  if (!grouped) return [{ name: "all", sessions }];
-  const groups = new Map<string, DiscoveredSession[]>();
-  for (const session of sessions) {
-    const name = session.projectName || noProjectLabel;
-    groups.set(name, [...(groups.get(name) ?? []), session]);
-  }
-  return [...groups.entries()]
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([name, entries]) => ({ name, sessions: entries }));
 }

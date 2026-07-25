@@ -4,7 +4,6 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   CodexSessionLogTracker,
-  inferCodexLogActivity,
   reduceCodexLogLines
 } from "./codex-session-log";
 
@@ -143,19 +142,16 @@ describe("Codex session log activity", () => {
     });
   });
 
-  it("recognizes a host-side approval pause after reasoning stops", () => {
+  it("keeps a reasoning-only active turn working instead of guessing approval", () => {
     const state = reduceCodexLogLines([
       event("task_started", "turn-1"),
       reasoning()
     ]);
 
-    expect(state.approvalPendingLikely).toBe(true);
-    expect(
-      inferCodexLogActivity(state, 1_000, 9_001)
-    ).toBe("attention");
-    expect(
-      inferCodexLogActivity(state, 1_000, 8_999)
-    ).toBe("working");
+    expect(state).toEqual({
+      activity: "working",
+      activeTurnId: "turn-1"
+    });
   });
 
   it("clears outstanding attention calls when the turn ends", () => {
