@@ -31,6 +31,8 @@ const api: AgentSignalApi = {
     ipcRenderer.invoke("sessions:dismiss-prompt", sessionId),
   openSession: (sessionId: string) =>
     ipcRenderer.invoke("sessions:open", sessionId),
+  openCodexThread: (threadId: string) =>
+    ipcRenderer.invoke("subagents:open", threadId),
   refresh: () => ipcRenderer.invoke("sessions:refresh"),
   setCompactMode: (compact: boolean) =>
     ipcRenderer.invoke("window:compact", compact),

@@ -65,7 +65,8 @@ export function resolveTrackedSessions(
           : record.projectName,
         pinned: record.pinned ?? false,
         trackedAt: record.trackedAt,
-        available: true
+        available: true,
+        subagents: []
       };
     }
 
@@ -75,7 +76,8 @@ export function resolveTrackedSessions(
       pinned: record.pinned ?? false,
       status: "unavailable",
       statusText: "Sesja nie jest obecnie widoczna",
-      available: false
+      available: false,
+      subagents: []
     };
   });
 }

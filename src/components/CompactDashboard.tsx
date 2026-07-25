@@ -156,6 +156,23 @@ export function CompactDashboard({
               agentSessions,
               preferences.language
             );
+            const subagents = agentSessions.flatMap(
+              (session) => session.subagents
+            );
+            const activeSubagents = subagents.filter((subagent) =>
+              ["working", "attention"].includes(subagent.status)
+            ).length;
+            const manager =
+              agent === "codex" &&
+              preferences.showSubagentTeams &&
+              subagents.length > 0;
+            const visibleSummary =
+              manager && activeSubagents > 0
+                ? `${summary} · ${copy.subagents.summary(
+                    activeSubagents,
+                    subagents.length
+                  )}`
+                : summary;
             const sleeping =
               agentSessions.length > 0 &&
               agentSessions.every((session) =>
@@ -176,11 +193,12 @@ export function CompactDashboard({
                   status={status}
                   size="large"
                   sleeping={sleeping}
+                  manager={manager}
                   language={preferences.language}
                 />
                 <span>
                   <strong>{agent === "codex" ? "Codex" : "Claude"}</strong>
-                  <small title={summary}>{summary}</small>
+                  <small title={visibleSummary}>{visibleSummary}</small>
                 </span>
               </div>
             );

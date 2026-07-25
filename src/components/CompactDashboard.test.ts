@@ -16,7 +16,8 @@ const baseSession: TrackedSession = {
   updatedAt: "2026-07-24T12:00:00.000Z",
   trackedAt: "2026-07-24T11:00:00.000Z",
   pinned: false,
-  available: true
+  available: true,
+  subagents: []
 };
 
 describe("compact agent summary", () => {

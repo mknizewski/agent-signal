@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { mapClaudeSession, mapCodexThread } from "./external-sessions";
+import {
+  isCodexSubagentThread,
+  mapClaudeSession,
+  mapCodexSubagent,
+  mapCodexThread
+} from "./external-sessions";
 
 const now = new Date("2026-07-24T12:00:00.000Z");
 
@@ -97,6 +102,72 @@ describe("external session mapping", () => {
     );
 
     expect(session.status).toBe("unavailable");
+  });
+
+  it("maps a spawned Codex thread to its explicit parent session", () => {
+    const thread = {
+      id: "child-thread",
+      agentNickname: "Scout",
+      agentRole: "Explore the provider API",
+      updatedAt: now.getTime() - 2_000,
+      status: { type: "active" },
+      source: {
+        subAgent: {
+          thread_spawn: {
+            parent_thread_id: "parent-thread",
+            depth: 1,
+            agent_nickname: "Fallback",
+            agent_role: "Fallback role"
+          }
+        }
+      }
+    };
+
+    expect(isCodexSubagentThread(thread)).toBe(true);
+    expect(mapCodexSubagent(thread, now)).toMatchObject({
+      threadId: "child-thread",
+      parentThreadId: "parent-thread",
+      title: "Scout",
+      role: "Explore the provider API",
+      depth: 1,
+      status: "working"
+    });
+  });
+
+  it("treats an unloaded spawned thread as completed", () => {
+    const subagent = mapCodexSubagent(
+      {
+        id: "completed-child",
+        preview: "Run regression tests",
+        status: { type: "notLoaded" },
+        source: {
+          subAgent: {
+            thread_spawn: {
+              parent_thread_id: "parent-thread",
+              depth: 2
+            }
+          }
+        }
+      },
+      now
+    );
+
+    expect(subagent?.status).toBe("idle");
+    expect(subagent?.depth).toBe(2);
+  });
+
+  it("does not infer a team relationship without thread-spawn metadata", () => {
+    const unrelatedThread = {
+      id: "review-thread",
+      agentNickname: "Reviewer",
+      status: { type: "active" },
+      source: {
+        subAgent: "review"
+      }
+    };
+
+    expect(isCodexSubagentThread(unrelatedThread)).toBe(false);
+    expect(mapCodexSubagent(unrelatedThread, now)).toBeUndefined();
   });
 
   it("maps recent Claude Code transcripts to working sessions", () => {

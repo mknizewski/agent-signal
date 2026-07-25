@@ -20,7 +20,8 @@ const snapshot: AppSnapshot = {
       trackedAt: "2026-07-25T10:00:30.000Z",
       pinned: false,
       threadId: "secret-thread-id",
-      available: true
+      available: true,
+      subagents: []
     }
   ],
   archivedSessions: [],

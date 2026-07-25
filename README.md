@@ -16,6 +16,8 @@
   <img alt="Local first" src="https://img.shields.io/badge/data-local--first-e4a62b" />
 </p>
 
+![Agent Signal promotional artwork with animated status pets and red, yellow, and green signals](docs/screenshots/agent-signal-promo.png)
+
 Agent Signal is a companion dashboard, not another chat client. It discovers
 existing local Codex and Claude Code sessions, lets you choose which ones to
 watch, and keeps their state readable at a glance. It never sends prompts,
@@ -42,6 +44,8 @@ Version 0.6.1 turns the flat watch list into a configurable project workspace:
   notifications, language, and pet behavior;
 - naturally written Polish and English interface copy;
 - sleeping pets after a configurable idle period, set to 15 minutes by default;
+- a live Codex subagent team panel with mini-pets, roles, statuses, direct child
+  chat navigation, and a playful manager animation for the parent pet;
 - a corrected approval state that requires an explicit approval or input signal;
 - a 10-second grace period and optional muting for approval-wait notifications,
   without delaying or hiding the dashboard status;
@@ -89,6 +93,24 @@ Agent Signal can listen for sessions that appear while it is running. An
 optional prompt in the lower-right corner asks whether the new chat should be
 watched. Both discovery and the prompt can be switched off independently.
 
+### Codex subagent teams
+
+When a watched Codex chat spawns subagents, Agent Signal attaches them to their
+real parent conversation instead of mixing them into the ordinary chat picker.
+The collapsible team panel shows a mini-pet, nickname or task name, role, and
+current runtime state for every child. Select a child to open that exact Codex
+thread.
+
+The parent pet switches into a light-hearted manager animation while it has a
+team. Compact mode keeps the manager cue and adds the active/total subagent
+count to the Codex summary. The whole feature can be disabled in Settings.
+
+![Codex parent chat with a collapsible team of animated subagents](docs/screenshots/subagent-team-0.6.1.png)
+
+Subagent relationships come from the explicit `subAgentThreadSpawn` metadata
+reported by the local Codex App Server. Agent Signal does not guess a parent
+from titles, paths, or timing.
+
 ## Status model
 
 | Color | Status | Meaning |
@@ -119,8 +141,10 @@ Consumer Claude Chat and Cowork conversations are not imported.
 
 Choose **Widok → Tryb kompaktowy** / **View → Compact mode** for an aggregate
 traffic-light display. It shows exact counts for working, approval, and idle
-sessions, plus a per-provider summary. Each signal has a restrained colored
-halo so its state remains legible without overpowering a dark desktop.
+sessions, plus a per-provider summary and Codex subagent activity when present.
+Each signal has a restrained colored halo so its state remains legible without
+overpowering a dark desktop. The synchronization footer uses a larger,
+integer-sized font weight and size so it stays crisp at native Windows scaling.
 
 ![Agent Signal compact mode with illuminated traffic lights](docs/screenshots/compact-dark-0.6.1.png)
 
@@ -129,7 +153,9 @@ halo so its state remains legible without overpowering a dark desktop.
 Codex and Claude Code have distinct animated status pets. A working pet
 animates, an approval state asks for attention, and an idle pet can fall asleep
 with a small `zzz` animation. The sleep threshold is configurable from 1 to 120
-minutes and defaults to 15 minutes.
+minutes and defaults to 15 minutes. A Codex parent with subagents becomes a
+playful manager with a tie, clipboard, and pointing gesture while its mini-pets
+work underneath.
 
 ## Preferences and languages
 
@@ -142,6 +168,7 @@ The Settings view saves changes automatically. Available controls include:
 - new-session listening and the watch prompt;
 - system notifications;
 - separate approval-wait alerts for desktop and mobile;
+- Codex subagent team panels and the parent manager animation;
 - sleeping-pet animation and its idle threshold.
 
 ## Mobile dashboard
@@ -254,6 +281,9 @@ See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 ## Current limitations
 
 - Claude Code activity detection is based on the latest activity timestamp.
+- The subagent team panel currently uses Codex App Server metadata. Claude Code
+  subagents are not shown until its local SDK exposes an equally explicit
+  parent-child session relationship.
 - Agent Signal does not control agents or respond to approval requests.
 - Local history availability depends on the installed Codex and Claude Code
   versions.

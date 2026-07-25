@@ -13,7 +13,8 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   detectNewSessions: true,
   promptForNewSessions: true,
   systemNotifications: true,
-  approvalNotifications: true
+  approvalNotifications: true,
+  showSubagentTeams: true
 };
 
 export function normalizePreferences(

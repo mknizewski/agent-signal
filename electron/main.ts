@@ -276,6 +276,9 @@ function registerIpc(): void {
   ipcMain.handle("sessions:open", async (_event, sessionId: unknown) => {
     await openSessionInSource(parseSessionId(sessionId));
   });
+  ipcMain.handle("subagents:open", async (_event, threadId: unknown) => {
+    await openCodexThreadInSource(parseCodexThreadId(threadId));
+  });
   ipcMain.handle("window:compact", (_event, compact: unknown) => {
     if (typeof compact !== "boolean") {
       throw new TypeError("Nieprawidłowa wartość trybu kompaktowego.");
@@ -474,6 +477,16 @@ function parseSessionId(value: unknown): string {
   return value;
 }
 
+function parseCodexThreadId(value: unknown): string {
+  if (
+    typeof value !== "string" ||
+    !/^[a-zA-Z0-9_-]{1,128}$/.test(value)
+  ) {
+    throw new TypeError("Nieprawidłowy identyfikator wątku Codexa.");
+  }
+  return value;
+}
+
 function parseDeviceId(value: unknown): string {
   if (
     typeof value !== "string" ||
@@ -490,19 +503,23 @@ async function verifyPackagedRenderer(): Promise<void> {
     const result = (await mainWindow?.webContents.executeJavaScript(`
       (() => ({
         title: document.title,
-        appShell: Boolean(document.querySelector(".app-shell")),
+        shell: document.querySelector(".app-shell")
+          ? "dashboard"
+          : document.querySelector(".compact-shell")
+            ? "compact"
+            : null,
         hasPreloadApi: Boolean(window.agentSignal),
         language: document.documentElement.lang
       }))()
     `)) as
       | {
           title: string;
-          appShell: boolean;
+          shell: "dashboard" | "compact" | null;
           hasPreloadApi: boolean;
           language: string;
         }
       | undefined;
-    if (!result?.appShell) {
+    if (!result?.shell) {
       throw new Error("current Agent Signal dashboard was not rendered");
     }
     if (!result.hasPreloadApi) {
@@ -525,9 +542,7 @@ function failAppSmoke(message: string): void {
 async function openSessionInSource(sessionId: string): Promise<void> {
   const record = requireManager().getTrackedSessionRecord(sessionId);
   if (record.source === "codex-app" && record.threadId) {
-    await shell.openExternal(
-      `codex://threads/${encodeURIComponent(record.threadId)}`
-    );
+    await openCodexThreadInSource(record.threadId);
     return;
   }
 
@@ -572,6 +587,12 @@ async function openSessionInSource(sessionId: string): Promise<void> {
   }
 
   throw new Error("Ta sesja nie ma identyfikatora potrzebnego do otwarcia.");
+}
+
+async function openCodexThreadInSource(threadId: string): Promise<void> {
+  await shell.openExternal(
+    `codex://threads/${encodeURIComponent(threadId)}`
+  );
 }
 
 function parseUpdateTrackedSessionInput(
@@ -623,7 +644,8 @@ function parsePreferencesPatch(input: unknown): Partial<AppPreferences> {
     "detectNewSessions",
     "promptForNewSessions",
     "systemNotifications",
-    "approvalNotifications"
+    "approvalNotifications",
+    "showSubagentTeams"
   ] as const;
   for (const key of booleanKeys) {
     if (candidate[key] === undefined) continue;

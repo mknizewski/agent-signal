@@ -31,6 +31,18 @@ export interface TrackedSession extends DiscoveredSession {
   trackedAt: string;
   available: boolean;
   pinned: boolean;
+  subagents: SessionSubagent[];
+}
+
+export interface SessionSubagent {
+  id: string;
+  threadId: string;
+  parentThreadId: string;
+  title: string;
+  role?: string;
+  depth: number;
+  status: SessionStatus;
+  updatedAt: string;
 }
 
 export interface TrackedSessionRecord {
@@ -83,6 +95,7 @@ export interface AppPreferences {
   promptForNewSessions: boolean;
   systemNotifications: boolean;
   approvalNotifications: boolean;
+  showSubagentTeams: boolean;
 }
 
 export interface ProviderStatus {
@@ -195,6 +208,7 @@ export interface AgentSignalApi {
   ): Promise<AppSnapshot>;
   dismissSessionPrompt(sessionId: string): Promise<AppSnapshot>;
   openSession(sessionId: string): Promise<void>;
+  openCodexThread(threadId: string): Promise<void>;
   refresh(): Promise<AppSnapshot>;
   setCompactMode(compact: boolean): Promise<void>;
   setWindowTheme(theme: "light" | "dark"): Promise<void>;

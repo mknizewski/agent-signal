@@ -6,6 +6,7 @@ import type {
   ProviderStatus,
   ProjectGroupConfig,
   ReorderProjectGroupsInput,
+  SessionSubagent,
   TrackSessionsInput,
   TrackedSessionRecord,
   UpdateProjectGroupInput,
@@ -32,6 +33,7 @@ export class DashboardManager {
   private records: TrackedSessionRecord[] = [];
   private archivedRecords: ArchivedSessionRecord[] = [];
   private catalog: DiscoveredSession[] = [];
+  private subagents: SessionSubagent[] = [];
   private preferences: AppPreferences = DEFAULT_PREFERENCES;
   private projectGroups: ProjectGroupConfig[] = [];
   private pendingSessionPrompts = new Set<string>();
@@ -58,12 +60,26 @@ export class DashboardManager {
   }
 
   getSnapshot(): AppSnapshot {
+    const subagentsByParent = new Map<string, SessionSubagent[]>();
+    for (const subagent of this.subagents) {
+      const current = subagentsByParent.get(subagent.parentThreadId) ?? [];
+      current.push(subagent);
+      subagentsByParent.set(subagent.parentThreadId, current);
+    }
+    const trackedSessions = resolveTrackedSessions(
+      this.records,
+      this.catalog,
+      this.preferences.autoGroupProjects
+    ).map((session) => ({
+      ...session,
+      subagents: session.threadId
+        ? (subagentsByParent.get(session.threadId) ?? []).sort(
+            compareSubagents
+          )
+        : []
+    }));
     return {
-      trackedSessions: resolveTrackedSessions(
-        this.records,
-        this.catalog,
-        this.preferences.autoGroupProjects
-      ),
+      trackedSessions,
       archivedSessions: this.archivedRecords,
       availableSessions: untrackedSessions(
         this.records,
@@ -308,7 +324,7 @@ export class DashboardManager {
             ? [record.threadId]
             : []
         ),
-      onSessions: (sessions) => {
+      onSessions: (sessions, subagents) => {
         const hiddenIds = new Set([
           ...this.records.map((record) => record.id),
           ...this.archivedRecords.map((record) => record.id)
@@ -332,6 +348,7 @@ export class DashboardManager {
         );
         this.catalogInitialized = true;
         this.catalog = sessions;
+        this.subagents = subagents;
         this.emit();
       },
       onDiagnostic: (message, error) => {
@@ -372,4 +389,27 @@ export class DashboardManager {
 function publicProviderStatus(provider: ProviderStatus): ProviderStatus {
   const { executable: _executable, ...publicStatus } = provider;
   return publicStatus;
+}
+
+function compareSubagents(
+  left: SessionSubagent,
+  right: SessionSubagent
+): number {
+  const activePriority = (status: SessionSubagent["status"]) =>
+    status === "attention"
+      ? 0
+      : status === "working"
+        ? 1
+        : status === "error"
+          ? 2
+          : status === "idle"
+            ? 3
+            : 4;
+  const priorityDifference =
+    activePriority(left.status) - activePriority(right.status);
+  if (priorityDifference !== 0) return priorityDifference;
+  return (
+    new Date(right.updatedAt).getTime() -
+    new Date(left.updatedAt).getTime()
+  );
 }

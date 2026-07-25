@@ -3,8 +3,13 @@ import {
   type ChildProcessWithoutNullStreams
 } from "node:child_process";
 import readline from "node:readline";
-import type { DiscoveredSession } from "../../src/shared/types";
+import type {
+  DiscoveredSession,
+  SessionSubagent
+} from "../../src/shared/types";
 import {
+  isCodexSubagentThread,
+  mapCodexSubagent,
   mapClaudeSession,
   mapCodexThread,
   type ClaudeExternalSession,
@@ -35,7 +40,10 @@ interface ClaudeSessionSdk {
 interface ExternalSessionSyncOptions {
   getCodexExecutable(): string | undefined;
   getTrackedCodexThreadIds(): string[];
-  onSessions(sessions: DiscoveredSession[]): void;
+  onSessions(
+    sessions: DiscoveredSession[],
+    subagents: SessionSubagent[]
+  ): void;
   onDiagnostic?(message: string, error?: unknown): void;
 }
 
@@ -52,11 +60,13 @@ const CODEX_SOURCE_KINDS = [
   "appServer",
   "unknown"
 ];
+const CODEX_SUBAGENT_SOURCE_KINDS = ["subAgentThreadSpawn"];
 
 export class ExternalSessionSync {
   private codexClient?: CodexHistoryClient;
   private codexExecutable?: string;
   private codexSessions: DiscoveredSession[] = [];
+  private codexSubagents: SessionSubagent[] = [];
   private claudeSessions: DiscoveredSession[] = [];
   private readonly codexLogs = new CodexSessionLogTracker();
   private timer?: NodeJS.Timeout;
@@ -102,13 +112,14 @@ export class ExternalSessionSync {
         new Date(right.updatedAt).getTime() -
         new Date(left.updatedAt).getTime()
     );
-    this.options.onSessions(sessions);
+    this.options.onSessions(sessions, this.codexSubagents);
   }
 
   private async refreshCodex(): Promise<void> {
     const executable = this.options.getCodexExecutable();
     if (!executable) {
       this.codexSessions = [];
+      this.codexSubagents = [];
       this.codexClient?.close();
       this.codexClient = undefined;
       this.codexExecutable = undefined;
@@ -122,14 +133,22 @@ export class ExternalSessionSync {
     }
 
     try {
-      const threads = await this.codexClient.listThreads();
+      const [threads, subagentThreads] = await Promise.all([
+        this.codexClient.listThreads(CODEX_SOURCE_KINDS),
+        this.codexClient.listSubagentThreads()
+      ]);
       const enrichedThreads = await this.codexLogs.enrich(
-        threads,
+        threads.filter((thread) => !isCodexSubagentThread(thread)),
         this.options.getTrackedCodexThreadIds()
       );
       this.codexSessions = enrichedThreads.map((thread) =>
         mapCodexThread(thread)
       );
+      this.codexSubagents = subagentThreads
+        .map((thread) => mapCodexSubagent(thread))
+        .filter(
+          (subagent): subagent is SessionSubagent => Boolean(subagent)
+        );
     } catch (error) {
       this.options.onDiagnostic?.(
         "Nie udało się zsynchronizować historii Codexa.",
@@ -175,7 +194,18 @@ class CodexHistoryClient {
 
   constructor(private readonly executable: string) {}
 
-  async listThreads(): Promise<CodexExternalThread[]> {
+  async listSubagentThreads(): Promise<CodexExternalThread[]> {
+    try {
+      return await this.listThreads(CODEX_SUBAGENT_SOURCE_KINDS);
+    } catch {
+      // Older App Server versions do not recognize subagent source filters.
+      return [];
+    }
+  }
+
+  async listThreads(
+    sourceKinds: string[] = CODEX_SOURCE_KINDS
+  ): Promise<CodexExternalThread[]> {
     await this.ensureReady();
 
     const threads: CodexExternalThread[] = [];
@@ -187,7 +217,7 @@ class CodexHistoryClient {
         limit: EXTERNAL_SESSION_LIMIT,
         sortKey: "updated_at",
         sortDirection: "desc",
-        sourceKinds: CODEX_SOURCE_KINDS
+        sourceKinds
       })) as {
         data?: CodexExternalThread[];
         nextCursor?: string | null;

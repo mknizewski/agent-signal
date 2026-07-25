@@ -7,6 +7,7 @@ import { formatRelativeTime, statusLabel } from "../shared/status";
 import { isSessionSleeping } from "../shared/preferences";
 import { copyFor, localizeRuntimeText } from "../lib/i18n";
 import { StatusPet } from "./StatusPet";
+import { SubagentTeamPanel } from "./SubagentTeamPanel";
 
 interface TrackedChatRowProps {
   session: TrackedSession;
@@ -14,6 +15,7 @@ interface TrackedChatRowProps {
   preferences: AppPreferences;
   onArchive(sessionId: string): void;
   onOpen(sessionId: string): void;
+  onOpenSubagent(threadId: string): void;
   onTogglePin(sessionId: string, pinned: boolean): void;
 }
 
@@ -23,6 +25,7 @@ export function TrackedChatRow({
   preferences,
   onArchive,
   onOpen,
+  onOpenSubagent,
   onTogglePin
 }: TrackedChatRowProps) {
   const copy = copyFor(preferences.language);
@@ -32,11 +35,16 @@ export function TrackedChatRow({
     now,
     preferences
   );
+  const visibleSubagents = preferences.showSubagentTeams
+    ? session.subagents
+    : [];
 
   return (
     <article
       id={`session-${session.id}`}
-      className={`chat-row ${session.pinned ? "chat-row--pinned" : ""}`}
+      className={`chat-row ${session.pinned ? "chat-row--pinned" : ""} ${
+        visibleSubagents.length > 0 ? "chat-row--has-team" : ""
+      }`}
       onDoubleClick={(event) => {
         if (
           preferences.openChatOnDoubleClick &&
@@ -56,6 +64,7 @@ export function TrackedChatRow({
         agent={session.agent}
         status={session.status}
         sleeping={sleeping}
+        manager={visibleSubagents.length > 0}
         language={preferences.language}
       />
 
@@ -119,6 +128,14 @@ export function TrackedChatRow({
           <Archive size={15} />
         </button>
       </div>
+
+      {visibleSubagents.length > 0 && (
+        <SubagentTeamPanel
+          subagents={visibleSubagents}
+          language={preferences.language}
+          onOpen={onOpenSubagent}
+        />
+      )}
     </article>
   );
 }

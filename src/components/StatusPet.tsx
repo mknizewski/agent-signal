@@ -8,8 +8,9 @@ import { statusLabel } from "../shared/status";
 interface StatusPetProps {
   agent: AgentKind;
   status: SessionStatus;
-  size?: "small" | "large";
+  size?: "mini" | "small" | "large";
   sleeping?: boolean;
+  manager?: boolean;
   language?: AppLanguage;
 }
 
@@ -18,6 +19,7 @@ export function StatusPet({
   status,
   size = "small",
   sleeping = false,
+  manager = false,
   language = "pl"
 }: StatusPetProps) {
   const agentLabel = agent === "codex" ? "Codex" : "Claude";
@@ -26,7 +28,7 @@ export function StatusPet({
     <span
       className={`status-pet status-pet--${agent} status-pet--${status} status-pet--${size} ${
         sleeping ? "status-pet--sleeping" : ""
-      }`}
+      } ${manager ? "status-pet--manager" : ""}`}
       role="img"
       aria-label={`${agentLabel}: ${statusLabel(status, language)}`}
     >
@@ -49,7 +51,14 @@ export function StatusPet({
       {!sleeping && status === "attention" && (
         <i className="status-pet__wave" aria-hidden="true" />
       )}
-      {!sleeping && status === "working" && (
+      {!sleeping && manager && (
+        <span className="status-pet__manager" aria-hidden="true">
+          <i className="status-pet__manager-tie" />
+          <i className="status-pet__manager-clipboard" />
+          <i className="status-pet__manager-pointer" />
+        </span>
+      )}
+      {!sleeping && status === "working" && !manager && (
         <span className="status-pet__work" aria-hidden="true">
           <i className="status-pet__work-item status-pet__work-item--laptop">
             <i className="status-pet__laptop" />

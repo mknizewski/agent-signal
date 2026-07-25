@@ -87,6 +87,24 @@ const translations = {
       delete: "Usuń z archiwum",
       archived: "Zarchiwizowano"
     },
+    subagents: {
+      title: "Zespół subagentów",
+      manager: "Manager zespołu",
+      collapse: "Zwiń zespół",
+      expand: "Rozwiń zespół",
+      summary: (working: number, total: number) =>
+        working > 0
+          ? `${working} ${working === 1 ? "pracuje" : "pracują"} · ${total} razem`
+          : `${total} ${total === 1 ? "ukończony" : "ukończone"}`,
+      open: "Otwórz subagenta",
+      more: (count: number) => `+${count} więcej`,
+      roleFallback: "Zadanie pomocnicze",
+      working: "Pracuje",
+      attention: "Czeka na decyzję",
+      idle: "Ukończony",
+      error: "Błąd",
+      unavailable: "Stan nieznany"
+    },
     groups: {
       edit: "Edytuj grupę",
       drag: "Przeciągnij, aby zmienić kolejność",
@@ -150,6 +168,9 @@ const translations = {
       sleepingPet: "Pokazuj śpiącego pupila",
       sleepingPetDescription:
         "Pupil zasypia, gdy sesja pozostaje bezczynna przez określony czas.",
+      subagentTeams: "Pokazuj zespoły subagentów",
+      subagentTeamsDescription:
+        "Wyświetla mini-pupile subagentów i animację managera przy głównym czacie.",
       idleAfter: "Uśpij po",
       minutes: "min",
       saved: "Preferencje zapisują się automatycznie."
@@ -315,6 +336,24 @@ const translations = {
       delete: "Remove from archive",
       archived: "Archived"
     },
+    subagents: {
+      title: "Subagent team",
+      manager: "Team manager",
+      collapse: "Collapse team",
+      expand: "Expand team",
+      summary: (working: number, total: number) =>
+        working > 0
+          ? `${working} working · ${total} total`
+          : `${total} completed`,
+      open: "Open subagent",
+      more: (count: number) => `+${count} more`,
+      roleFallback: "Supporting task",
+      working: "Working",
+      attention: "Waiting for input",
+      idle: "Completed",
+      error: "Error",
+      unavailable: "Status unknown"
+    },
     groups: {
       edit: "Edit group",
       drag: "Drag to reorder",
@@ -378,6 +417,9 @@ const translations = {
       sleepingPet: "Show sleeping pets",
       sleepingPetDescription:
         "A pet falls asleep after its session has been idle for a while.",
+      subagentTeams: "Show subagent teams",
+      subagentTeamsDescription:
+        "Shows subagent mini-pets and a manager animation on the parent chat.",
       idleAfter: "Sleep after",
       minutes: "min",
       saved: "Preferences are saved automatically."

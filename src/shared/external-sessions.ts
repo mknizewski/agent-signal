@@ -1,4 +1,8 @@
-import type { DiscoveredSession, SessionStatus } from "./types";
+import type {
+  DiscoveredSession,
+  SessionStatus,
+  SessionSubagent
+} from "./types";
 import { projectNameFromPath } from "./preferences";
 
 export interface CodexThreadStatus {
@@ -16,6 +20,22 @@ export interface CodexExternalThread {
   updatedAt?: number | string | null;
   status?: CodexThreadStatus | null;
   logActivity?: "working" | "attention" | "idle" | "unknown";
+  agentNickname?: string | null;
+  agentRole?: string | null;
+  source?:
+    | string
+    | {
+        subAgent?:
+          | string
+          | {
+              thread_spawn?: {
+                parent_thread_id?: string;
+                depth?: number;
+                agent_nickname?: string | null;
+                agent_role?: string | null;
+              };
+            };
+      };
 }
 
 export interface ClaudeExternalSession {
@@ -54,6 +74,48 @@ export function mapCodexThread(
     createdAt,
     updatedAt,
     threadId: thread.id
+  };
+}
+
+export function isCodexSubagentThread(
+  thread: CodexExternalThread
+): boolean {
+  return Boolean(subagentSpawnSource(thread));
+}
+
+export function mapCodexSubagent(
+  thread: CodexExternalThread,
+  now = new Date()
+): SessionSubagent | undefined {
+  const source = subagentSpawnSource(thread);
+  if (!source?.parent_thread_id) return undefined;
+  const updatedAt = toIso(thread.updatedAt, now);
+  const preview = cleanText(thread.preview);
+  const nickname =
+    cleanText(thread.agentNickname) ||
+    cleanText(source.agent_nickname);
+  const role =
+    cleanText(thread.agentRole) ||
+    cleanText(source.agent_role);
+  const status = codexSubagentStatus(thread);
+
+  return {
+    id: `codex-subagent:${thread.id}`,
+    threadId: thread.id,
+    parentThreadId: source.parent_thread_id,
+    title:
+      nickname ||
+      cleanText(thread.name) ||
+      role ||
+      preview ||
+      "Subagent",
+    ...(role ? { role } : {}),
+    depth:
+      typeof source.depth === "number" && Number.isFinite(source.depth)
+        ? Math.max(1, Math.round(source.depth))
+        : 1,
+    status,
+    updatedAt
   };
 }
 
@@ -122,6 +184,45 @@ function codexStatus(
     Math.abs(now.getTime() - new Date(updatedAt).getTime()) <=
     EXTERNAL_ACTIVITY_WINDOW_MS;
   return recentlyActive ? "working" : "unavailable";
+}
+
+function codexSubagentStatus(
+  thread: CodexExternalThread
+): SessionStatus {
+  const runtimeStatus = thread.status?.type;
+  const activeFlags = thread.status?.activeFlags ?? [];
+  if (
+    runtimeStatus === "active" &&
+    activeFlags.some((flag) =>
+      ["waitingOnApproval", "waitingOnUserInput"].includes(flag)
+    )
+  ) {
+    return "attention";
+  }
+  if (runtimeStatus === "active") return "working";
+  if (runtimeStatus === "systemError") return "error";
+  if (runtimeStatus === "idle" || runtimeStatus === "notLoaded") {
+    return "idle";
+  }
+  return "unavailable";
+}
+
+function subagentSpawnSource(
+  thread: CodexExternalThread
+):
+  | {
+      parent_thread_id?: string;
+      depth?: number;
+      agent_nickname?: string | null;
+      agent_role?: string | null;
+    }
+  | undefined {
+  if (!thread.source || typeof thread.source !== "object") {
+    return undefined;
+  }
+  const subAgent = thread.source.subAgent;
+  if (!subAgent || typeof subAgent !== "object") return undefined;
+  return subAgent.thread_spawn;
 }
 
 function codexStatusText(status: SessionStatus): string {

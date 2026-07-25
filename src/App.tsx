@@ -356,6 +356,14 @@ export default function App() {
     }
   };
 
+  const openCodexThread = async (threadId: string) => {
+    try {
+      await agentApi.openCodexThread(threadId);
+    } catch (error) {
+      showError(error);
+    }
+  };
+
   const updateProjectGroup = async (input: UpdateProjectGroupInput) => {
     try {
       setSnapshot(await agentApi.updateProjectGroup(input));
@@ -927,6 +935,7 @@ export default function App() {
                               preferences={snapshot.preferences}
                               onArchive={archiveSession}
                               onOpen={openSession}
+                              onOpenSubagent={openCodexThread}
                               onTogglePin={togglePin}
                             />
                           ))}

@@ -5,6 +5,7 @@ import type {
   ArchivedSessionRecord,
   DiscoveredSession,
   MobileGatewayStatus,
+  SessionSubagent,
   TrackSessionsInput,
   TrackedSession
 } from "../shared/types";
@@ -63,6 +64,39 @@ const demoCatalog: DiscoveredSession[] = [
   })
 ];
 
+const demoSubagents: SessionSubagent[] = [
+  {
+    id: "codex-subagent:demo-research",
+    threadId: "demo-research",
+    parentThreadId: "codex:demo-1",
+    title: "Scout",
+    role: "Analiza modułu",
+    depth: 1,
+    status: "working",
+    updatedAt: new Date(demoNow - 7_000).toISOString()
+  },
+  {
+    id: "codex-subagent:demo-tests",
+    threadId: "demo-tests",
+    parentThreadId: "codex:demo-1",
+    title: "Tester",
+    role: "Testy regresji",
+    depth: 1,
+    status: "working",
+    updatedAt: new Date(demoNow - 12_000).toISOString()
+  },
+  {
+    id: "codex-subagent:demo-review",
+    threadId: "demo-review",
+    parentThreadId: "codex:demo-1",
+    title: "Reviewer",
+    role: "Przegląd zmian",
+    depth: 1,
+    status: "idle",
+    updatedAt: new Date(demoNow - 2 * 60_000).toISOString()
+  }
+];
+
 let demoSnapshot: AppSnapshot = {
   updatedAt: new Date().toISOString(),
   providers: {
@@ -99,7 +133,9 @@ let demoSnapshot: AppSnapshot = {
     ...item,
     trackedAt: new Date(demoNow - 2 * 60 * 60_000).toISOString(),
     pinned: item.id === "codex:demo-1",
-    available: true
+    available: true,
+    subagents:
+      item.threadId === "codex:demo-1" ? demoSubagents : []
   })),
   archivedSessions: demoCatalog.slice(3, 4).map((item) => ({
     ...stripRuntimeStatus(item),
@@ -138,7 +174,8 @@ const demoApi: AgentSignalApi = {
           ...item,
           trackedAt,
           pinned: false,
-          available: true
+          available: true,
+          subagents: []
         }))
       ],
       availableSessions: demoSnapshot.availableSessions.filter(
@@ -295,6 +332,7 @@ const demoApi: AgentSignalApi = {
     return demoSnapshot;
   },
   openSession: async () => undefined,
+  openCodexThread: async () => undefined,
   refresh: async () => {
     emitDemo();
     return demoSnapshot;
@@ -382,6 +420,7 @@ function stripRuntimeStatus(
       status: _status,
       statusText: _statusText,
       available: _available,
+      subagents: _subagents,
       ...record
     } = session;
     return record;
@@ -405,14 +444,17 @@ function restoreDemoSession(session: ArchivedSessionRecord): TrackedSession {
         ...current,
         trackedAt: record.trackedAt,
         pinned: record.pinned ?? false,
-        available: true
+        available: true,
+        subagents:
+          current.threadId === "codex:demo-1" ? demoSubagents : []
       }
     : {
         ...record,
         pinned: record.pinned ?? false,
         status: "unavailable",
         statusText: "Sesja nie jest obecnie widoczna",
-        available: false
+        available: false,
+        subagents: []
       };
 }
 

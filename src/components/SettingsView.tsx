@@ -133,6 +133,12 @@ export function SettingsView({
           description={copy.settings.sleepingPetDescription}
           onChange={(value) => onUpdate({ idlePetAnimation: value })}
         />
+        <PreferenceToggle
+          checked={preferences.showSubagentTeams}
+          label={copy.settings.subagentTeams}
+          description={copy.settings.subagentTeamsDescription}
+          onChange={(value) => onUpdate({ showSubagentTeams: value })}
+        />
         <label
           className={`preference-number ${
             !preferences.idlePetAnimation ? "is-disabled" : ""
