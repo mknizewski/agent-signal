@@ -29,5 +29,7 @@ describe("CompactDashboard controls", () => {
     expect(markup).toContain("lucide-arrow-left");
     expect(markup).toContain('aria-label="Pełny widok"');
     expect(markup).not.toContain('aria-label="Wyjście"');
+    expect(markup).not.toContain("app-titlebar");
+    expect(markup).not.toContain("app-menu");
   });
 });

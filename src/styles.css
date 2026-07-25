@@ -109,14 +109,6 @@ body {
   flex: 1;
 }
 
-.app-titlebar--compact .app-titlebar__menus {
-  padding-left: 10px;
-}
-
-.app-titlebar--compact .app-titlebar__icon {
-  margin-right: 0;
-}
-
 .app-menu {
   position: relative;
   height: 100%;
@@ -2631,7 +2623,7 @@ html[data-compact="true"] body {
 .compact-shell {
   width: 100vw;
   min-width: 0;
-  height: calc(100vh - var(--titlebar-height));
+  height: 100vh;
   overflow: hidden;
   background: var(--canvas);
 }
@@ -2641,9 +2633,10 @@ html[data-compact="true"] body {
   height: 50px;
   align-items: center;
   justify-content: space-between;
-  padding: 0 10px 0 12px;
+  padding: 0 142px 0 12px;
   border-bottom: 1px solid var(--line);
   background: var(--sidebar);
+  -webkit-app-region: drag;
 }
 
 .brand--compact {
@@ -2654,6 +2647,7 @@ html[data-compact="true"] body {
 .compact-header__actions {
   display: flex;
   gap: 1px;
+  -webkit-app-region: no-drag;
 }
 
 .compact-header .icon-button {
@@ -2669,9 +2663,15 @@ html[data-compact="true"] body {
 
 .compact-dashboard {
   display: flex;
-  height: calc(100vh - var(--titlebar-height) - 50px);
+  height: calc(100vh - 50px);
   flex-direction: column;
   padding: 15px 16px 11px;
+}
+
+@media (max-width: 365px) {
+  .brand--compact strong {
+    display: none;
+  }
 }
 
 .compact-title {

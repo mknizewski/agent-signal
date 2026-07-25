@@ -488,11 +488,6 @@ export default function App() {
   if (compact) {
     return (
       <div className="app-frame">
-        <AppTitleBar
-          compact
-          language={snapshot.preferences.language}
-          onToggleCompact={() => setCompact(false)}
-        />
         <CompactDashboard
           counts={counts}
           sessions={snapshot.trackedSessions}
@@ -516,7 +511,6 @@ export default function App() {
   return (
     <div className="app-frame">
       <AppTitleBar
-        compact={false}
         language={snapshot.preferences.language}
         onToggleCompact={() => setCompact(true)}
       />

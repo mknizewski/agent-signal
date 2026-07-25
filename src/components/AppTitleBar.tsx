@@ -4,7 +4,6 @@ import { copyFor } from "../lib/i18n";
 import type { AppLanguage } from "../shared/types";
 
 interface AppTitleBarProps {
-  compact: boolean;
   language: AppLanguage;
   onToggleCompact(): void;
 }
@@ -12,7 +11,6 @@ interface AppTitleBarProps {
 type OpenMenu = "file" | "view" | null;
 
 export function AppTitleBar({
-  compact,
   language,
   onToggleCompact
 }: AppTitleBarProps) {
@@ -42,11 +40,7 @@ export function AppTitleBar({
   };
 
   return (
-    <header
-      className={`app-titlebar ${
-        compact ? "app-titlebar--compact" : ""
-      }`}
-    >
+    <header className="app-titlebar">
       <div
         className="app-titlebar__menus"
         ref={menuRoot}
@@ -60,68 +54,64 @@ export function AppTitleBar({
           <i />
         </span>
 
-        {!compact && (
-          <>
-            <div className="app-menu">
+        <div className="app-menu">
+          <button
+            className={openMenu === "file" ? "is-open" : ""}
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded={openMenu === "file"}
+            onClick={() => toggleMenu("file")}
+          >
+            {copy.titlebar.file}
+          </button>
+          {openMenu === "file" && (
+            <div
+              className="app-menu__popover"
+              role="menu"
+            >
               <button
-                className={openMenu === "file" ? "is-open" : ""}
                 type="button"
-                aria-haspopup="menu"
-                aria-expanded={openMenu === "file"}
-                onClick={() => toggleMenu("file")}
+                role="menuitem"
+                onClick={() => {
+                  setOpenMenu(null);
+                  void agentApi.exitApp();
+                }}
               >
-                {copy.titlebar.file}
+                <span>{copy.titlebar.exit}</span>
+                <kbd>Alt+F4</kbd>
               </button>
-              {openMenu === "file" && (
-                <div
-                  className="app-menu__popover"
-                  role="menu"
-                >
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setOpenMenu(null);
-                      void agentApi.exitApp();
-                    }}
-                  >
-                    <span>{copy.titlebar.exit}</span>
-                    <kbd>Alt+F4</kbd>
-                  </button>
-                </div>
-              )}
             </div>
+          )}
+        </div>
 
-            <div className="app-menu">
+        <div className="app-menu">
+          <button
+            className={openMenu === "view" ? "is-open" : ""}
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded={openMenu === "view"}
+            onClick={() => toggleMenu("view")}
+          >
+            {copy.titlebar.view}
+          </button>
+          {openMenu === "view" && (
+            <div
+              className="app-menu__popover"
+              role="menu"
+            >
               <button
-                className={openMenu === "view" ? "is-open" : ""}
                 type="button"
-                aria-haspopup="menu"
-                aria-expanded={openMenu === "view"}
-                onClick={() => toggleMenu("view")}
+                role="menuitem"
+                onClick={() => {
+                  setOpenMenu(null);
+                  onToggleCompact();
+                }}
               >
-                {copy.titlebar.view}
+                <span>{copy.titlebar.compactView}</span>
               </button>
-              {openMenu === "view" && (
-                <div
-                  className="app-menu__popover"
-                  role="menu"
-                >
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setOpenMenu(null);
-                      onToggleCompact();
-                    }}
-                  >
-                    <span>{copy.titlebar.compactView}</span>
-                  </button>
-                </div>
-              )}
             </div>
-          </>
-        )}
+          )}
+        </div>
       </div>
       <div className="app-titlebar__drag" />
     </header>
