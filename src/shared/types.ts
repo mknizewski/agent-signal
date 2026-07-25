@@ -43,6 +43,15 @@ export interface TrackedSessionRecord {
   sessionId?: string;
 }
 
+export interface ArchivedSessionRecord extends TrackedSessionRecord {
+  archivedAt: string;
+}
+
+export interface TrackingState {
+  trackedSessions: TrackedSessionRecord[];
+  archivedSessions: ArchivedSessionRecord[];
+}
+
 export interface ProviderStatus {
   id: AgentKind;
   available: boolean;
@@ -55,6 +64,7 @@ export interface ProviderStatus {
 
 export interface AppSnapshot {
   trackedSessions: TrackedSession[];
+  archivedSessions: ArchivedSessionRecord[];
   availableSessions: DiscoveredSession[];
   providers: Record<AgentKind, ProviderStatus>;
   updatedAt: string;
@@ -67,7 +77,9 @@ export interface TrackSessionsInput {
 export interface AgentSignalApi {
   getSnapshot(): Promise<AppSnapshot>;
   trackSessions(input: TrackSessionsInput): Promise<AppSnapshot>;
-  untrackSession(sessionId: string): Promise<AppSnapshot>;
+  archiveSession(sessionId: string): Promise<AppSnapshot>;
+  restoreArchivedSession(sessionId: string): Promise<AppSnapshot>;
+  deleteArchivedSession(sessionId: string): Promise<AppSnapshot>;
   refresh(): Promise<AppSnapshot>;
   setCompactMode(compact: boolean): Promise<void>;
   setWindowTheme(theme: "light" | "dark"): Promise<void>;

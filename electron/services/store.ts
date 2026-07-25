@@ -1,10 +1,20 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { TrackedSessionRecord } from "../../src/shared/types";
+import type {
+  ArchivedSessionRecord,
+  TrackingState,
+  TrackedSessionRecord
+} from "../../src/shared/types";
 
-interface StoredState {
+interface StoredStateV2 {
   version: 2;
   trackedSessions: TrackedSessionRecord[];
+}
+
+interface StoredStateV3 {
+  version: 3;
+  trackedSessions: TrackedSessionRecord[];
+  archivedSessions: ArchivedSessionRecord[];
 }
 
 export class TrackingStore {
@@ -14,24 +24,48 @@ export class TrackingStore {
     this.filePath = path.join(userDataPath, "agent-signal-state.json");
   }
 
-  async load(): Promise<TrackedSessionRecord[]> {
+  async load(): Promise<TrackingState> {
     try {
       const raw = await readFile(this.filePath, "utf8");
-      const parsed = JSON.parse(raw) as Partial<StoredState>;
-      if (parsed.version !== 2 || !Array.isArray(parsed.trackedSessions)) {
-        return [];
+      const parsed = JSON.parse(raw) as Partial<StoredStateV2 | StoredStateV3>;
+      if (!Array.isArray(parsed.trackedSessions)) {
+        return emptyState();
       }
-      return parsed.trackedSessions;
+      if (parsed.version === 2) {
+        return {
+          trackedSessions: parsed.trackedSessions,
+          archivedSessions: []
+        };
+      }
+      if (parsed.version === 3 && Array.isArray(parsed.archivedSessions)) {
+        return {
+          trackedSessions: parsed.trackedSessions,
+          archivedSessions: parsed.archivedSessions
+        };
+      }
+      return emptyState();
     } catch {
-      return [];
+      return emptyState();
     }
   }
 
-  async save(trackedSessions: TrackedSessionRecord[]): Promise<void> {
+  async save(state: TrackingState): Promise<void> {
     await mkdir(path.dirname(this.filePath), { recursive: true });
     const temporaryPath = `${this.filePath}.tmp`;
-    const state: StoredState = { version: 2, trackedSessions };
-    await writeFile(temporaryPath, JSON.stringify(state, null, 2), "utf8");
+    const storedState: StoredStateV3 = {
+      version: 3,
+      trackedSessions: state.trackedSessions,
+      archivedSessions: state.archivedSessions
+    };
+    await writeFile(
+      temporaryPath,
+      JSON.stringify(storedState, null, 2),
+      "utf8"
+    );
     await rename(temporaryPath, this.filePath);
   }
+}
+
+function emptyState(): TrackingState {
+  return { trackedSessions: [], archivedSessions: [] };
 }

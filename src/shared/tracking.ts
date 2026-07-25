@@ -1,4 +1,5 @@
 import type {
+  ArchivedSessionRecord,
   DiscoveredSession,
   TrackedSession,
   TrackedSessionRecord
@@ -21,6 +22,24 @@ export function createTrackingRecord(
     threadId: session.threadId,
     sessionId: session.sessionId
   };
+}
+
+export function createArchivedSessionRecord(
+  record: TrackedSessionRecord,
+  currentSession?: DiscoveredSession,
+  archivedAt = new Date().toISOString()
+): ArchivedSessionRecord {
+  const latestRecord = currentSession
+    ? createTrackingRecord(currentSession, record.trackedAt)
+    : record;
+  return { ...latestRecord, archivedAt };
+}
+
+export function restoreTrackingRecord(
+  archived: ArchivedSessionRecord
+): TrackedSessionRecord {
+  const { archivedAt: _archivedAt, ...record } = archived;
+  return record;
 }
 
 export function resolveTrackedSessions(
@@ -50,8 +69,12 @@ export function resolveTrackedSessions(
 
 export function untrackedSessions(
   records: TrackedSessionRecord[],
-  catalog: DiscoveredSession[]
+  catalog: DiscoveredSession[],
+  archivedRecords: ArchivedSessionRecord[] = []
 ): DiscoveredSession[] {
-  const trackedIds = new Set(records.map((record) => record.id));
-  return catalog.filter((session) => !trackedIds.has(session.id));
+  const hiddenIds = new Set([
+    ...records.map((record) => record.id),
+    ...archivedRecords.map((record) => record.id)
+  ]);
+  return catalog.filter((session) => !hiddenIds.has(session.id));
 }

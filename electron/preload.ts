@@ -9,8 +9,12 @@ const api: AgentSignalApi = {
   getSnapshot: () => ipcRenderer.invoke("snapshot:get"),
   trackSessions: (input: TrackSessionsInput) =>
     ipcRenderer.invoke("sessions:track", input),
-  untrackSession: (sessionId: string) =>
-    ipcRenderer.invoke("sessions:untrack", sessionId),
+  archiveSession: (sessionId: string) =>
+    ipcRenderer.invoke("sessions:archive", sessionId),
+  restoreArchivedSession: (sessionId: string) =>
+    ipcRenderer.invoke("sessions:restore", sessionId),
+  deleteArchivedSession: (sessionId: string) =>
+    ipcRenderer.invoke("sessions:delete-archived", sessionId),
   refresh: () => ipcRenderer.invoke("sessions:refresh"),
   setCompactMode: (compact: boolean) =>
     ipcRenderer.invoke("window:compact", compact),

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { DiscoveredSession } from "./types";
 import {
+  createArchivedSessionRecord,
   createTrackingRecord,
   resolveTrackedSessions,
+  restoreTrackingRecord,
   untrackedSessions
 } from "./tracking";
 
@@ -50,5 +52,31 @@ describe("tracking sessions", () => {
     const record = createTrackingRecord(session);
     expect(untrackedSessions([record], [session])).toEqual([]);
     expect(untrackedSessions([], [session])).toEqual([session]);
+  });
+
+  it("archives the latest session metadata and restores its tracking record", () => {
+    const record = createTrackingRecord(
+      session,
+      "2026-07-24T12:01:00.000Z"
+    );
+    const archived = createArchivedSessionRecord(
+      record,
+      { ...session, title: "Naprawione logowanie" },
+      "2026-07-24T13:00:00.000Z"
+    );
+
+    expect(archived.title).toBe("Naprawione logowanie");
+    expect(archived.archivedAt).toBe("2026-07-24T13:00:00.000Z");
+    expect(restoreTrackingRecord(archived)).toEqual({
+      ...record,
+      title: "Naprawione logowanie"
+    });
+  });
+
+  it("keeps archived sessions out of the add-chat catalog", () => {
+    const record = createTrackingRecord(session);
+    const archived = createArchivedSessionRecord(record);
+
+    expect(untrackedSessions([], [session], [archived])).toEqual([]);
   });
 });
