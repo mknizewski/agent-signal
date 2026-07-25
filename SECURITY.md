@@ -35,6 +35,10 @@ wymaga trwałego tokenu urządzenia uzyskanego przez jednorazowy, wygasający ko
 QR. Token jest przechowywany na telefonie w bezpiecznym cookie, a aplikacja
 desktopowa zapisuje tylko jego skrót.
 
+Gateway jest domyślnie wyłączony i można uruchomić go wyłącznie z aplikacji
+desktopowej. Nie rozgłasza swojej obecności przez mDNS. Samo znalezienie
+adresu i portu w sieci lokalnej nie daje dostępu do mobilnego API.
+
 Mobilne API celowo nie zawiera podsumowań, ścieżek projektów, archiwum ani
 źródłowych identyfikatorów sesji. Telefon otrzymuje wyłącznie nieodwracalny
 klucz wpisu, tytuł, rodzaj agenta, status i czas aktualizacji.

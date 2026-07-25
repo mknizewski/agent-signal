@@ -30,6 +30,7 @@ dashboard.
 - Track selected Codex and Claude Code sessions in one place.
 - Automatically refresh status without sending prompts.
 - Traffic-light states: working, needs attention, and idle.
+- Detect pending Codex approval and user-input requests from local session logs.
 - Distinct animated pets for Codex and Claude.
 - Native notifications when a session needs attention or finishes working.
 - Search and filter tracked conversations.
@@ -38,7 +39,9 @@ dashboard.
 - Light and dark themes.
 - Compact aggregate traffic-light view.
 - Optional Android dashboard paired by QR over the local Wi-Fi network.
+- Installable Android PWA with live status updates from the desktop app.
 - Android Web Push notifications while the desktop app remains active.
+- Manage, revoke, or reset trusted phones from the desktop application.
 - Persist tracked and archived sessions locally.
 - Minimal interface designed to feel at home beside Codex.
 
@@ -99,6 +102,12 @@ The pairing code expires after 60 seconds. Once paired, a phone reconnects
 automatically whenever AgentSignal is running. You can revoke an individual
 phone or reset all mobile access from the same desktop dialog.
 
+Mobile access is disabled on a fresh installation and can be started only
+from the desktop application. AgentSignal does not announce the gateway
+through mDNS. Knowing the computer's address or scanning the LAN is not enough
+to read any status data: mobile API calls require a trusted-device token
+created by the single-use QR pairing flow.
+
 Closing the desktop window keeps AgentSignal active in the Windows tray.
 Choose **Wyjście** from the application or tray menu to stop monitoring and
 make the mobile dashboard go offline.
@@ -156,6 +165,7 @@ Useful commands:
 pnpm typecheck       # TypeScript checks
 pnpm test            # unit tests
 pnpm test:sync-smoke # local provider integration smoke test
+pnpm test:mobile-smoke # paired mobile gateway smoke test
 pnpm build           # production build
 pnpm dist            # Windows installer in release/
 ```
@@ -172,6 +182,8 @@ AgentSignal is local-first:
 - It uses the Claude SDK only to list local sessions.
 - Its optional mobile gateway listens only on the selected private network
   interface and accepts paired devices from the same IPv4 subnet.
+- It does not advertise the mobile gateway through mDNS; an unauthenticated
+  client cannot read the mobile API.
 - It sends mobile clients only titles, agent kinds, status labels, and update
   times. Project paths, summaries, archives, and source session identifiers
   are not part of the mobile API.
@@ -221,8 +233,7 @@ build/           application icon
 - The mobile dashboard currently targets Android 12+ and works only within the
   same private IPv4 subnet.
 - Some guest Wi-Fi networks block device-to-device traffic. AgentSignal uses
-  the computer's private IPv4 address for pairing and does not depend on mDNS
-  name resolution on Android.
+  the computer's private IPv4 address for pairing and does not use mDNS.
 - Background mobile notifications require internet access to the browser's
   Web Push service.
 

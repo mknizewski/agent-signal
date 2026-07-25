@@ -1,7 +1,6 @@
 const assert = require("node:assert/strict");
 const { mkdtemp, rm } = require("node:fs/promises");
 const https = require("node:https");
-const createMulticastDns = require("multicast-dns");
 const os = require("node:os");
 const path = require("node:path");
 
@@ -33,7 +32,6 @@ async function main() {
     const status = gateway.getStatus();
     assert.equal(status.running, true);
     assert.ok(status.address);
-    await assertMdnsAddress(status.hostname, status.address);
     const pairing = await gateway.createPairing();
     const pairingUrl = new URL(pairing.pairingUrl);
     assert.equal(pairingUrl.hostname, status.address);
@@ -65,6 +63,13 @@ async function main() {
     assert.equal(JSON.stringify(snapshot).includes("C:\\secret"), false);
     assert.equal(JSON.stringify(snapshot).includes("source-thread-id"), false);
 
+    const malformedCookieResponse = await request(
+      status.address,
+      "/api/v1/snapshot",
+      { headers: { Cookie: "__Host-agentsignal-device=%" } }
+    );
+    assert.equal(malformedCookieResponse.statusCode, 401);
+
     const mobilePage = await request(status.address, "/");
     assert.equal(mobilePage.statusCode, 200);
     assert.match(mobilePage.body, /AgentSignal Mobile/);
@@ -75,40 +80,6 @@ async function main() {
     await gateway?.stop();
     await rm(temporaryDirectory, { recursive: true, force: true });
   }
-}
-
-function assertMdnsAddress(hostname, expectedAddress) {
-  return new Promise((resolve, reject) => {
-    const mdns = createMulticastDns({
-      interface: expectedAddress,
-      type: "udp4",
-      loopback: true
-    });
-    const timer = setTimeout(() => {
-      mdns.destroy();
-      reject(new Error(`mDNS did not resolve ${hostname}`));
-    }, 5_000);
-    const finish = (error) => {
-      clearTimeout(timer);
-      mdns.destroy();
-      error ? reject(error) : resolve();
-    };
-    mdns.on("response", (response) => {
-      const answer = response.answers.find(
-        (item) => item.name === hostname && item.type === "A"
-      );
-      if (!answer) return;
-      finish(
-        answer.data === expectedAddress
-          ? undefined
-          : new Error(`mDNS returned ${answer.data}, expected ${expectedAddress}`)
-      );
-    });
-    mdns.once("error", finish);
-    mdns.once("ready", () => {
-      mdns.query([{ name: hostname, type: "A" }]);
-    });
-  });
 }
 
 function request(hostname, requestPath, options = {}) {

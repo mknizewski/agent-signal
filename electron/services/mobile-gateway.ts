@@ -1,10 +1,14 @@
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import {
+  createHash,
+  randomBytes,
+  randomUUID,
+  timingSafeEqual
+} from "node:crypto";
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createServer as createHttpsServer } from "node:https";
 import { readFile, stat } from "node:fs/promises";
 import { networkInterfaces } from "node:os";
 import path from "node:path";
-import createMulticastDns = require("multicast-dns");
 import QRCode from "qrcode";
 import webPush, { type PushSubscription } from "web-push";
 import type {
@@ -68,7 +72,6 @@ export class MobileGateway {
   private currentNetwork?: NetworkTarget;
   private httpsServer?: ReturnType<typeof createHttpsServer>;
   private bootstrapServer?: ReturnType<typeof createHttpServer>;
-  private mdns?: createMulticastDns.MulticastDNS;
   private readonly pairingRegistry = new MobilePairingRegistry(PAIRING_TTL_MS);
   private readonly pairingFailures = new Map<string, PairingFailureWindow>();
   private readonly eventClients = new Set<EventClient>();
@@ -142,10 +145,8 @@ export class MobileGateway {
 
     const { secret, expiresAt } = this.pairingRegistry.create();
     const certificateUrl = `http://${network.address}:${BOOTSTRAP_PORT}/`;
-    // Android/Chrome does not resolve arbitrary .local names reliably on every
-    // network (notably with Private DNS enabled). The server certificate also
-    // contains the selected private IPv4 address, so use it as the canonical
-    // pairing origin and keep mDNS only as an optional convenience.
+    // The server certificate contains the selected private IPv4 address. Use
+    // it directly so pairing neither depends on nor advertises through mDNS.
     const pairingUrl =
       `https://${network.address}:${HTTPS_PORT}/pair#pair=${secret}`;
 
@@ -288,46 +289,6 @@ export class MobileGateway {
       );
     });
 
-    const mdnsHostname = this.state.certificates.hostname;
-    this.mdns = createMulticastDns({
-      interface: network.address,
-      type: "udp4",
-      loopback: true
-    });
-    this.mdns.on("query", (query) => {
-      const requested = query.questions.some(
-        (question) =>
-          question.name.toLowerCase() === mdnsHostname.toLowerCase() &&
-          question.type === "A"
-      );
-      if (requested) {
-        this.mdns?.respond([
-          {
-            name: mdnsHostname,
-            type: "A",
-            class: "IN",
-            ttl: 120,
-            flush: true,
-            data: network.address
-          }
-        ]);
-      }
-    });
-    this.mdns.on("error", (error) => {
-      this.options.onDiagnostic?.("Błąd rozgłaszania nazwy mDNS.", error);
-    });
-    this.mdns.once("ready", () => {
-      this.mdns?.respond([
-        {
-          name: mdnsHostname,
-          type: "A",
-          class: "IN",
-          ttl: 120,
-          flush: true,
-          data: network.address
-        }
-      ]);
-    });
     this.heartbeat = setInterval(() => {
       for (const client of [...this.eventClients]) {
         if (!client.response.writableEnded) {
@@ -348,8 +309,6 @@ export class MobileGateway {
     this.pairingFailures.clear();
     for (const client of this.eventClients) client.response.end();
     this.eventClients.clear();
-    this.mdns?.destroy();
-    this.mdns = undefined;
     const servers = [this.httpsServer, this.bootstrapServer];
     this.httpsServer = undefined;
     this.bootstrapServer = undefined;
@@ -614,7 +573,9 @@ export class MobileGateway {
     const cookie = parseCookie(request.headers.cookie ?? "")[COOKIE_NAME];
     if (!cookie) return undefined;
     const hash = hashToken(cookie);
-    return this.state.devices.find((device) => device.tokenHash === hash);
+    return this.state.devices.find((device) =>
+      equalTokenHashes(device.tokenHash, hash)
+    );
   }
 
   private touchDevice(device: StoredMobileDevice): void {
@@ -865,17 +826,34 @@ function normalizeAddress(value?: string): string {
 }
 
 function parseCookie(value: string): Record<string, string> {
-  return Object.fromEntries(
-    value
-      .split(";")
-      .map((part) => part.trim().split("="))
-      .filter(([key, item]) => key && item)
-      .map(([key, item]) => [key, decodeURIComponent(item)])
-  );
+  const cookies: Record<string, string> = {};
+  for (const part of value.split(";")) {
+    const separator = part.indexOf("=");
+    if (separator <= 0) continue;
+    const key = part.slice(0, separator).trim();
+    const raw = part.slice(separator + 1).trim();
+    if (!key || !raw) continue;
+    try {
+      cookies[key] = decodeURIComponent(raw);
+    } catch {
+      // Ignore malformed cookies instead of turning an unauthenticated request
+      // into a server error.
+    }
+  }
+  return cookies;
 }
 
 function hashToken(value: string): string {
   return createHash("sha256").update(value).digest("base64url");
+}
+
+function equalTokenHashes(left: string, right: string): boolean {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  return (
+    leftBuffer.length === rightBuffer.length &&
+    timingSafeEqual(leftBuffer, rightBuffer)
+  );
 }
 
 function sanitizeDeviceName(value: string): string {
@@ -929,6 +907,8 @@ function applySecurityHeaders(response: ServerResponse): void {
   response.setHeader("X-Content-Type-Options", "nosniff");
   response.setHeader("Referrer-Policy", "no-referrer");
   response.setHeader("X-Frame-Options", "DENY");
+  response.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  response.setHeader("Cross-Origin-Resource-Policy", "same-origin");
   response.setHeader(
     "Content-Security-Policy",
     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"

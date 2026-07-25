@@ -255,7 +255,7 @@ class CodexHistoryClient {
       clientInfo: {
         name: "agent_signal_sync",
         title: "AgentSignal Sync",
-        version: "0.4.4"
+        version: "0.6.0"
       },
       capabilities: { experimentalApi: true }
     });
