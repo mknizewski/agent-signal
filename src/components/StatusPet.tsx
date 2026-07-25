@@ -11,6 +11,7 @@ interface StatusPetProps {
   size?: "mini" | "small" | "large";
   sleeping?: boolean;
   manager?: boolean;
+  motion?: "dashboard" | "compact";
   language?: AppLanguage;
 }
 
@@ -20,15 +21,19 @@ export function StatusPet({
   size = "small",
   sleeping = false,
   manager = false,
+  motion = "dashboard",
   language = "pl"
 }: StatusPetProps) {
   const agentLabel = agent === "codex" ? "Codex" : "Claude";
+  const compactMotion = motion === "compact";
 
   return (
     <span
       className={`status-pet status-pet--${agent} status-pet--${status} status-pet--${size} ${
         sleeping ? "status-pet--sleeping" : ""
-      } ${manager ? "status-pet--manager" : ""}`}
+      } ${manager ? "status-pet--manager" : ""} ${
+        compactMotion ? "status-pet--compact-motion" : ""
+      }`}
       role="img"
       aria-label={`${agentLabel}: ${statusLabel(status, language)}`}
     >
@@ -48,17 +53,17 @@ export function StatusPet({
           <i>z</i>
         </span>
       )}
-      {!sleeping && status === "attention" && (
+      {!compactMotion && !sleeping && status === "attention" && (
         <i className="status-pet__wave" aria-hidden="true" />
       )}
-      {!sleeping && manager && (
+      {!compactMotion && !sleeping && manager && (
         <span className="status-pet__manager" aria-hidden="true">
           <i className="status-pet__manager-tie" />
           <i className="status-pet__manager-clipboard" />
           <i className="status-pet__manager-pointer" />
         </span>
       )}
-      {!sleeping && status === "working" && !manager && (
+      {!compactMotion && !sleeping && status === "working" && !manager && (
         <span className="status-pet__work" aria-hidden="true">
           <i className="status-pet__work-item status-pet__work-item--laptop">
             <i className="status-pet__laptop" />

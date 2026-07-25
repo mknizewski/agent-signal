@@ -503,9 +503,7 @@ export default function App() {
           preferences={snapshot.preferences}
           onRefresh={refresh}
           onThemeToggle={toggleTheme}
-          onExit={() => {
-            void agentApi.exitApp();
-          }}
+          onExpand={() => setCompact(false)}
         />
         {toast && <Toast message={toast} />}
       </div>

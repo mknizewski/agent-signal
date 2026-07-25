@@ -155,10 +155,12 @@ Each signal has a restrained colored halo so its state remains legible without
 overpowering a dark desktop. The synchronization footer uses a larger,
 integer-sized font weight and size so it stays crisp at native Windows scaling.
 Compact mode also removes the File and View menus from its title bar, leaving
-more room for the signals. A dedicated Exit button sits beside the light/dark
-theme control, so the app can be stopped without expanding the dashboard.
+more room for the signals. A return arrow beside the light/dark theme control
+restores the full dashboard in one click. The two provider pets use a separate,
+restrained set of compact-only monitoring, alert, supervisor, and sleep
+animations instead of inheriting the dashboard's tools and gestures.
 
-![Agent Signal compact mode with illuminated traffic lights, hidden menus, and a dedicated Exit button](docs/screenshots/compact-dark-0.6.1-new.jpg)
+![Agent Signal compact mode with illuminated traffic lights and hidden menus](docs/screenshots/compact-dark-0.6.1-new.jpg)
 
 ## Pets and idle behavior
 
