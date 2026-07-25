@@ -5,91 +5,95 @@
 <h1 align="center">AgentSignal</h1>
 
 <p align="center">
-  Spokojny, lokalny dashboard do obserwowania wybranych sesji Codex i Claude Code.
+  A calm, local desktop dashboard for monitoring selected Codex and Claude Code sessions.
 </p>
 
 <p align="center">
-  <img alt="Windows 10 i 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-2563eb" />
+  <img alt="Windows 10 and 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-2563eb" />
   <img alt="Electron" src="https://img.shields.io/badge/Electron-43-47848f" />
-  <img alt="License MIT" src="https://img.shields.io/badge/license-MIT-3db47a" />
+  <img alt="MIT License" src="https://img.shields.io/badge/license-MIT-3db47a" />
   <img alt="Local first" src="https://img.shields.io/badge/data-local--first-e4a62b" />
 </p>
 
-AgentSignal nie jest kolejnym klientem czatu. Nie tworzy zadań, nie wysyła
-promptów i nie zastępuje aplikacji Codex ani Claude Code. Pozwala wybrać
-istniejące sesje, które mają pozostać widoczne na jednym dashboardzie.
+AgentSignal is not another chat client. It does not create tasks, send prompts,
+or replace the official Codex and Claude Code applications. Instead, it lets
+you choose existing sessions and keep their status visible in one focused
+dashboard.
 
-![Główny dashboard AgentSignal](docs/screenshots/dashboard-dark.png)
+![AgentSignal main dashboard](docs/screenshots/dashboard-dark.png)
 
-> Screenshoty korzystają wyłącznie z danych demonstracyjnych. Nie zawierają
-> prawdziwych rozmów ani ścieżek z komputera autora.
+> All screenshots use demonstration data. They do not contain real
+> conversations or paths from the author's computer.
 
-## Najważniejsze funkcje
+## Features
 
-- obserwowanie wybranych sesji Codex i Claude Code,
-- automatyczne odświeżanie statusów bez wysyłania promptów,
-- sygnalizacja świetlna: pracuje, wymaga uwagi i wolny,
-- oddzielne, animowane pupile dla Codexa i Claude'a,
-- powiadomienia systemowe, gdy sesja wymaga uwagi lub kończy pracę,
-- wyszukiwanie obserwowanych rozmów,
-- jasny i ciemny motyw,
-- kompaktowy widok zagregowany,
-- zapamiętywanie wybranych sesji i ustawień interfejsu,
-- minimalistyczny interfejs dopasowany do ekosystemu Codex.
+- Track selected Codex and Claude Code sessions in one place.
+- Automatically refresh status without sending prompts.
+- Traffic-light states: working, needs attention, and idle.
+- Distinct animated pets for Codex and Claude.
+- Native notifications when a session needs attention or finishes working.
+- Search and filter tracked conversations.
+- Archive completed items, restore them later, or remove them from the
+  dashboard archive.
+- Light and dark themes.
+- Compact aggregate traffic-light view.
+- Persist tracked and archived sessions locally.
+- Minimal interface designed to feel at home beside Codex.
 
-### Dodawanie istniejących sesji
+### Add existing sessions
 
-Przycisk **Dodaj czat** pokazuje sesje wykryte w lokalnej historii Codexa i
-Claude Code. Zaznaczenie pozycji dodaje ją wyłącznie do dashboardu.
+Select **Dodaj czat** (Add chat) to see sessions found in the local Codex and
+Claude Code history. Selecting a session adds it only to the AgentSignal
+dashboard.
 
-![Wybór sesji do obserwowania](docs/screenshots/chat-picker.png)
+![Selecting sessions to track](docs/screenshots/chat-picker.png)
 
-Usunięcie pozycji z AgentSignal nie usuwa oryginalnej rozmowy.
+Archiving or deleting an entry in AgentSignal never deletes the original
+conversation. Permanent dashboard removal is intentionally available only
+from the archive.
 
-### Tryb kompaktowy
+### Compact mode
 
-Menu **Widok → Tryb kompaktowy** zmniejsza okno do niewielkiego semafora.
-Widok pokazuje zagregowaną liczbę sesji w każdym stanie oraz osobny stan
-Codexa i Claude'a.
+Choose **Widok → Tryb kompaktowy** (View → Compact mode) to shrink AgentSignal
+into a small traffic-light panel. It shows aggregate counts for every state
+and an exact per-agent summary.
 
 <p align="center">
-  <img src="docs/screenshots/compact-dark.png" width="372" alt="Tryb kompaktowy AgentSignal" />
+  <img src="docs/screenshots/compact-dark.png" width="372" alt="AgentSignal compact mode" />
 </p>
 
-## Statusy
+## Status model
 
-| Kolor | Status | Znaczenie |
+| Color | Status | Meaning |
 | --- | --- | --- |
-| Czerwony | Pracuje | Agent wykonuje zadanie. |
-| Żółty | Wymaga uwagi | Sesja czeka na decyzję lub odpowiedź użytkownika. |
-| Zielony | Wolny | Agent nie wykonuje teraz pracy. |
-| Szary | Niedostępny | Nie udało się potwierdzić aktualnego stanu sesji. |
+| Red | Working | The agent is currently executing a task. |
+| Yellow | Needs attention | The session is waiting for a decision or user response. |
+| Green | Idle | The agent is not currently working. |
+| Gray | Unavailable | The current session state could not be confirmed. |
 
-Codex udostępnia listę sesji przez lokalny App Server. Dla obserwowanych
-rozmów AgentSignal odczytuje również zdarzenia `task_started`,
-`task_complete` i `turn_aborted` z lokalnego pliku JSONL. Dzięki temu długie
-zadanie pozostaje oznaczone jako aktywne również wtedy, gdy przez chwilę nie
-pojawiają się nowe wpisy.
+Codex exposes its session list through the local App Server. For tracked
+conversations, AgentSignal also reads `task_started`, `task_complete`, and
+`turn_aborted` events from the local JSONL history. This keeps long-running
+tasks marked as active even when the log is briefly quiet.
 
-Claude Code udostępnia lokalną historię przez metodę `listSessions` z
-oficjalnego SDK. Status pracy jest określany na podstawie czasu ostatniej
-aktywności sesji. Konsumenckie rozmowy z Claude Chat lub Cowork nie są
-importowane.
+Claude Code exposes local history through the official SDK's `listSessions`
+method. Its working state is inferred from the time of the latest session
+activity. Consumer Claude Chat and Cowork conversations are not imported.
 
-## Instalacja
+## Installation
 
-### Gotowy instalator
+### Windows installer
 
-1. Otwórz stronę [najnowszego wydania](../../releases/latest).
-2. Pobierz plik `AgentSignal-Setup-<wersja>.exe`.
-3. Uruchom instalator i wybierz katalog instalacji.
+1. Open the [latest AgentSignal release](https://github.com/mknizewski/agent-signal/releases/latest).
+2. Download `AgentSignal-Setup-<version>.exe`.
+3. Run the installer and choose an installation directory.
 
-Wymagany jest Windows 10 lub Windows 11 w wersji x64. AgentSignal może
-działać z samym Codexem, samym Claude Code albo z oboma źródłami.
+AgentSignal supports Windows 10 and Windows 11 on x64. It can run with Codex,
+Claude Code, or both sources installed.
 
-### Uruchomienie ze źródeł
+### Run from source
 
-Wymagane są Node.js 22+ i pnpm 11.
+Requirements: Node.js 22+ and pnpm 11.
 
 ```powershell
 git clone https://github.com/mknizewski/agent-signal.git
@@ -98,57 +102,58 @@ pnpm install
 pnpm dev
 ```
 
-Przydatne polecenia:
+Useful commands:
 
 ```powershell
-pnpm typecheck       # kontrola TypeScript
-pnpm test            # testy jednostkowe
-pnpm test:sync-smoke # lokalny test integracji źródeł
-pnpm build           # build produkcyjny
-pnpm dist            # instalator Windows w katalogu release/
+pnpm typecheck       # TypeScript checks
+pnpm test            # unit tests
+pnpm test:sync-smoke # local provider integration smoke test
+pnpm build           # production build
+pnpm dist            # Windows installer in release/
 ```
 
-## Prywatność i bezpieczeństwo
+## Privacy and security
 
-AgentSignal jest aplikacją local-first:
+AgentSignal is local-first:
 
-- nie ma własnego backendu ani telemetrii,
-- nie wysyła treści rozmów do serwera AgentSignal,
-- nie tworzy agentów i nie wysyła promptów,
-- nie modyfikuje ani nie usuwa oryginalnych sesji,
-- uruchamia Codex App Server lokalnie przez `stdio`,
-- korzysta z Claude SDK wyłącznie do listowania lokalnych sesji.
+- It has no AgentSignal backend or telemetry.
+- It does not send conversation content to an AgentSignal server.
+- It does not create agents or submit prompts.
+- It does not modify or delete original sessions.
+- It runs the Codex App Server locally over `stdio`.
+- It uses the Claude SDK only to list local sessions.
 
-Wybrane sesje są zapisywane lokalnie przez Electron w pliku
-`agent-signal-state.json` w katalogu danych aplikacji. Plik może zawierać
-tytuły, identyfikatory i ścieżki projektów obserwowanych sesji. Nie jest
-dołączany do repozytorium ani wysyłany przez AgentSignal.
+Tracked and archived sessions are stored by Electron in
+`agent-signal-state.json` inside the application's local data directory. That
+file can contain titles, identifiers, and project paths for sessions added to
+the dashboard. It is never included in this repository or uploaded by
+AgentSignal.
 
-Renderer działa z `contextIsolation`, sandboxem i bez dostępu do Node.js.
-Komunikacja IPC jest ograniczona do jawnie zdefiniowanych i walidowanych
-operacji. Aplikacja ma Content Security Policy, blokuje nowe okna i odmawia
-żądań uprawnień przeglądarkowych.
+The renderer runs with context isolation, sandboxing, and no Node.js access.
+IPC is limited to explicitly defined and validated operations. The application
+also uses a Content Security Policy, blocks new windows, and denies browser
+permission requests.
 
-Szczegóły zgłaszania problemów bezpieczeństwa znajdują się w
-[SECURITY.md](SECURITY.md).
+See [SECURITY.md](SECURITY.md) for vulnerability reporting instructions.
 
-## Struktura projektu
+## Project layout
 
 ```text
-electron/        proces główny, wykrywanie źródeł i synchronizacja
-src/             interfejs React oraz współdzielone modele statusów
-docs/screenshots materiały używane w README
-scripts/         smoke test i generator ikon
-build/           ikona aplikacji
+electron/        main process, provider detection, and synchronization
+src/             React interface and shared status models
+docs/screenshots README assets
+scripts/         provider smoke test and icon generator
+build/           application icon
 ```
 
-## Ograniczenia
+## Current limitations
 
-- wykrywanie Claude Code opiera się na czasie ostatniej aktywności,
-- AgentSignal nie steruje agentami i nie odpowiada na prośby o zgodę,
-- dostępność historii zależy od lokalnej instalacji Codex lub Claude Code,
-- obecny instalator jest przygotowany dla Windows x64.
+- Claude Code activity detection is based on the latest activity time.
+- AgentSignal does not control agents or answer approval requests.
+- Session history availability depends on the local Codex or Claude Code
+  installation.
+- The current installer targets Windows x64.
 
-## Licencja
+## License
 
 [MIT](LICENSE)

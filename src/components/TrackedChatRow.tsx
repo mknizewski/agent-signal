@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { Archive } from "lucide-react";
 import type { TrackedSession } from "../shared/types";
 import { formatRelativeTime, statusLabel } from "../shared/status";
 import { StatusPet } from "./StatusPet";
@@ -6,13 +6,13 @@ import { StatusPet } from "./StatusPet";
 interface TrackedChatRowProps {
   session: TrackedSession;
   now: Date;
-  onRemove(sessionId: string): void;
+  onArchive(sessionId: string): void;
 }
 
 export function TrackedChatRow({
   session,
   now,
-  onRemove
+  onArchive
 }: TrackedChatRowProps) {
   return (
     <article className="chat-row">
@@ -51,11 +51,11 @@ export function TrackedChatRow({
       <button
         className="row-action"
         type="button"
-        title="Przestań obserwować"
-        aria-label={`Przestań obserwować: ${session.title}`}
-        onClick={() => onRemove(session.id)}
+        title="Przenieś do archiwum"
+        aria-label={`Przenieś do archiwum: ${session.title}`}
+        onClick={() => onArchive(session.id)}
       >
-        <X size={16} />
+        <Archive size={15} />
       </button>
     </article>
   );

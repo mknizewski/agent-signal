@@ -1,6 +1,7 @@
 import type {
   AgentSignalApi,
   AppSnapshot,
+  ArchivedSessionRecord,
   DiscoveredSession,
   TrackSessionsInput,
   TrackedSession
@@ -79,7 +80,12 @@ let demoSnapshot: AppSnapshot = {
     trackedAt: new Date(demoNow - 2 * 60 * 60_000).toISOString(),
     available: true
   })),
-  availableSessions: demoCatalog.slice(3)
+  archivedSessions: demoCatalog.slice(3, 4).map((item) => ({
+    ...stripRuntimeStatus(item),
+    trackedAt: new Date(demoNow - 3 * 60 * 60_000).toISOString(),
+    archivedAt: new Date(demoNow - 45 * 60_000).toISOString()
+  })),
+  availableSessions: demoCatalog.slice(4)
 };
 
 const demoListeners = new Set<(snapshot: AppSnapshot) => void>();
@@ -114,7 +120,7 @@ const demoApi: AgentSignalApi = {
     emitDemo();
     return demoSnapshot;
   },
-  untrackSession: async (sessionId: string) => {
+  archiveSession: async (sessionId: string) => {
     const removed = demoSnapshot.trackedSessions.find(
       (item) => item.id === sessionId
     );
@@ -123,8 +129,46 @@ const demoApi: AgentSignalApi = {
       trackedSessions: demoSnapshot.trackedSessions.filter(
         (item) => item.id !== sessionId
       ),
+      archivedSessions: removed
+        ? [
+            {
+              ...stripRuntimeStatus(removed),
+              archivedAt: new Date().toISOString()
+            },
+            ...demoSnapshot.archivedSessions
+          ]
+        : demoSnapshot.archivedSessions
+    };
+    emitDemo();
+    return demoSnapshot;
+  },
+  restoreArchivedSession: async (sessionId: string) => {
+    const restored = demoSnapshot.archivedSessions.find(
+      (item) => item.id === sessionId
+    );
+    demoSnapshot = {
+      ...demoSnapshot,
+      archivedSessions: demoSnapshot.archivedSessions.filter(
+        (item) => item.id !== sessionId
+      ),
+      trackedSessions: restored
+        ? [...demoSnapshot.trackedSessions, restoreDemoSession(restored)]
+        : demoSnapshot.trackedSessions
+    };
+    emitDemo();
+    return demoSnapshot;
+  },
+  deleteArchivedSession: async (sessionId: string) => {
+    const removed = demoSnapshot.archivedSessions.find(
+      (item) => item.id === sessionId
+    );
+    demoSnapshot = {
+      ...demoSnapshot,
+      archivedSessions: demoSnapshot.archivedSessions.filter(
+        (item) => item.id !== sessionId
+      ),
       availableSessions: removed
-        ? [...demoSnapshot.availableSessions, stripTracking(removed)]
+        ? [...demoSnapshot.availableSessions, archivedToDiscovered(removed)]
         : demoSnapshot.availableSessions
     };
     emitDemo();
@@ -174,10 +218,57 @@ function session(input: {
   };
 }
 
-function stripTracking(session: TrackedSession): DiscoveredSession {
-  const { trackedAt: _trackedAt, available: _available, ...discovered } =
-    session;
-  return discovered;
+function stripRuntimeStatus(
+  session: DiscoveredSession | TrackedSession
+): Omit<ArchivedSessionRecord, "archivedAt"> {
+  if ("trackedAt" in session) {
+    const {
+      status: _status,
+      statusText: _statusText,
+      available: _available,
+      ...record
+    } = session;
+    return record;
+  }
+  const {
+    status: _status,
+    statusText: _statusText,
+    ...record
+  } = session;
+  return {
+    ...record,
+    trackedAt: new Date().toISOString()
+  };
+}
+
+function restoreDemoSession(session: ArchivedSessionRecord): TrackedSession {
+  const { archivedAt: _archivedAt, ...record } = session;
+  const current = demoCatalog.find((item) => item.id === session.id);
+  return current
+    ? { ...current, trackedAt: record.trackedAt, available: true }
+    : {
+        ...record,
+        status: "unavailable",
+        statusText: "Sesja nie jest obecnie widoczna",
+        available: false
+      };
+}
+
+function archivedToDiscovered(
+  session: ArchivedSessionRecord
+): DiscoveredSession {
+  const current = demoCatalog.find((item) => item.id === session.id);
+  if (current) return current;
+  const {
+    trackedAt: _trackedAt,
+    archivedAt: _archivedAt,
+    ...record
+  } = session;
+  return {
+    ...record,
+    status: "unavailable",
+    statusText: "Sesja nie jest obecnie widoczna"
+  };
 }
 
 export const agentApi: AgentSignalApi = window.agentSignal ?? demoApi;

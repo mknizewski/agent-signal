@@ -124,8 +124,14 @@ function registerIpc(): void {
     (_event, input: unknown) =>
       requireManager().trackSessions(parseTrackSessionsInput(input))
   );
-  ipcMain.handle("sessions:untrack", (_event, sessionId: unknown) =>
-    requireManager().untrackSession(parseSessionId(sessionId))
+  ipcMain.handle("sessions:archive", (_event, sessionId: unknown) =>
+    requireManager().archiveSession(parseSessionId(sessionId))
+  );
+  ipcMain.handle("sessions:restore", (_event, sessionId: unknown) =>
+    requireManager().restoreArchivedSession(parseSessionId(sessionId))
+  );
+  ipcMain.handle("sessions:delete-archived", (_event, sessionId: unknown) =>
+    requireManager().deleteArchivedSession(parseSessionId(sessionId))
   );
   ipcMain.handle("window:compact", (_event, compact: unknown) => {
     if (typeof compact !== "boolean") {

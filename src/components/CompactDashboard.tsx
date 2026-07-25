@@ -130,6 +130,7 @@ export function CompactDashboard({
               (session) => session.agent === agent
             );
             const status = aggregateAgentStatus(agentSessions);
+            const summary = compactAgentSummary(agentSessions);
             return (
               <div
                 className={`compact-agent compact-agent--${status}`}
@@ -142,11 +143,7 @@ export function CompactDashboard({
                 />
                 <span>
                   <strong>{agent === "codex" ? "Codex" : "Claude"}</strong>
-                  <small>
-                    {agentSessions.length === 0
-                      ? "Brak czatów"
-                      : `${statusLabel(status)} · ${agentSessions.length}`}
-                  </small>
+                  <small title={summary}>{summary}</small>
                 </span>
               </div>
             );
@@ -168,6 +165,45 @@ export function CompactDashboard({
       </main>
     </div>
   );
+}
+
+export function compactAgentSummary(sessions: TrackedSession[]): string {
+  if (sessions.length === 0) return "Brak czatów";
+
+  const counts = sessions.reduce<Record<SessionStatus, number>>(
+    (result, session) => {
+      result[session.status] += 1;
+      return result;
+    },
+    {
+      working: 0,
+      attention: 0,
+      idle: 0,
+      error: 0,
+      unavailable: 0
+    }
+  );
+  const parts: string[] = [];
+  if (counts.attention > 0) {
+    parts.push(
+      `${counts.attention} ${
+        counts.attention === 1 ? "wymaga uwagi" : "wymagają uwagi"
+      }`
+    );
+  }
+  if (counts.working > 0) {
+    parts.push(
+      `${counts.working} ${counts.working === 1 ? "pracuje" : "pracują"}`
+    );
+  }
+  if (counts.idle > 0) {
+    parts.push(`${counts.idle} ${counts.idle === 1 ? "wolny" : "wolne"}`);
+  }
+  const unknownCount = counts.error + counts.unavailable;
+  if (unknownCount > 0) {
+    parts.push(`${unknownCount} bez potwierdzonego stanu`);
+  }
+  return parts.join(" · ");
 }
 
 function aggregateAgentStatus(

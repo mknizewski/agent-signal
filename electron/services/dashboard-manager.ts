@@ -1,13 +1,16 @@
 import type {
   AppSnapshot,
+  ArchivedSessionRecord,
   DiscoveredSession,
   ProviderStatus,
   TrackSessionsInput,
   TrackedSessionRecord
 } from "../../src/shared/types";
 import {
+  createArchivedSessionRecord,
   createTrackingRecord,
   resolveTrackedSessions,
+  restoreTrackingRecord,
   untrackedSessions
 } from "../../src/shared/tracking";
 import { detectProviders } from "./detector";
@@ -16,6 +19,7 @@ import { TrackingStore } from "./store";
 
 export class DashboardManager {
   private records: TrackedSessionRecord[] = [];
+  private archivedRecords: ArchivedSessionRecord[] = [];
   private catalog: DiscoveredSession[] = [];
   private providers = detectProviders();
   private externalSessionSync?: ExternalSessionSync;
@@ -27,7 +31,9 @@ export class DashboardManager {
   ) {}
 
   async initialize(): Promise<void> {
-    this.records = await this.store.load();
+    const state = await this.store.load();
+    this.records = state.trackedSessions;
+    this.archivedRecords = state.archivedSessions;
     this.providers = detectProviders();
     this.emit();
     this.startExternalSync();
@@ -36,7 +42,12 @@ export class DashboardManager {
   getSnapshot(): AppSnapshot {
     return {
       trackedSessions: resolveTrackedSessions(this.records, this.catalog),
-      availableSessions: untrackedSessions(this.records, this.catalog),
+      archivedSessions: this.archivedRecords,
+      availableSessions: untrackedSessions(
+        this.records,
+        this.catalog,
+        this.archivedRecords
+      ),
       providers: {
         codex: publicProviderStatus(this.providers.codex),
         claude: publicProviderStatus(this.providers.claude)
@@ -54,10 +65,13 @@ export class DashboardManager {
     const catalogById = new Map(
       this.catalog.map((session) => [session.id, session])
     );
-    const trackedIds = new Set(this.records.map((record) => record.id));
+    const hiddenIds = new Set([
+      ...this.records.map((record) => record.id),
+      ...this.archivedRecords.map((record) => record.id)
+    ]);
     const now = new Date().toISOString();
     const sessionsToTrack = requestedIds
-      .filter((id) => !trackedIds.has(id))
+      .filter((id) => !hiddenIds.has(id))
       .map((id) => catalogById.get(id));
     if (sessionsToTrack.some((session) => !session)) {
       throw new Error("Wybrany czat nie jest już dostępny. Odśwież listę.");
@@ -71,11 +85,41 @@ export class DashboardManager {
     return this.getSnapshot();
   }
 
-  async untrackSession(sessionId: string): Promise<AppSnapshot> {
-    const previousLength = this.records.length;
-    this.records = this.records.filter((record) => record.id !== sessionId);
-    if (this.records.length === previousLength) {
+  async archiveSession(sessionId: string): Promise<AppSnapshot> {
+    const record = this.records.find((item) => item.id === sessionId);
+    if (!record) {
       throw new Error("Ten czat nie jest już obserwowany.");
+    }
+    const currentSession = this.catalog.find((item) => item.id === sessionId);
+    this.records = this.records.filter((item) => item.id !== sessionId);
+    this.archivedRecords.unshift(
+      createArchivedSessionRecord(record, currentSession)
+    );
+    this.persistAndEmit();
+    return this.getSnapshot();
+  }
+
+  async restoreArchivedSession(sessionId: string): Promise<AppSnapshot> {
+    const archived = this.archivedRecords.find((item) => item.id === sessionId);
+    if (!archived) {
+      throw new Error("Ten czat nie znajduje się już w archiwum.");
+    }
+    this.archivedRecords = this.archivedRecords.filter(
+      (item) => item.id !== sessionId
+    );
+    this.records.push(restoreTrackingRecord(archived));
+    this.persistAndEmit();
+    void this.externalSessionSync?.refreshNow();
+    return this.getSnapshot();
+  }
+
+  async deleteArchivedSession(sessionId: string): Promise<AppSnapshot> {
+    const previousLength = this.archivedRecords.length;
+    this.archivedRecords = this.archivedRecords.filter(
+      (item) => item.id !== sessionId
+    );
+    if (this.archivedRecords.length === previousLength) {
+      throw new Error("Ten czat nie znajduje się już w archiwum.");
     }
     this.persistAndEmit();
     return this.getSnapshot();
@@ -118,8 +162,16 @@ export class DashboardManager {
 
   private persistAndEmit(): void {
     const records = this.records.map((record) => ({ ...record }));
+    const archivedRecords = this.archivedRecords.map((record) => ({
+      ...record
+    }));
     this.saveQueue = this.saveQueue
-      .then(() => this.store.save(records))
+      .then(() =>
+        this.store.save({
+          trackedSessions: records,
+          archivedSessions: archivedRecords
+        })
+      )
       .catch((error) => {
         console.error("Could not save AgentSignal dashboard state", error);
       });

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
+  Archive,
   Bot,
   Circle,
   Moon,
@@ -18,16 +19,18 @@ import type {
 } from "./shared/types";
 import { SIGNAL_ORDER, statusDescription, statusLabel } from "./shared/status";
 import { AgentMark } from "./components/AgentMark";
+import { ArchivedChatRow } from "./components/ArchivedChatRow";
 import { AppTitleBar } from "./components/AppTitleBar";
 import { ChatPickerModal } from "./components/ChatPickerModal";
 import { CompactDashboard } from "./components/CompactDashboard";
 import { TrackedChatRow } from "./components/TrackedChatRow";
 
-type ViewFilter = "all" | "working" | "attention" | "idle";
+type ViewFilter = "all" | "working" | "attention" | "idle" | "archive";
 type Theme = "light" | "dark";
 
 const emptySnapshot: AppSnapshot = {
   trackedSessions: [],
+  archivedSessions: [],
   availableSessions: [],
   providers: {
     codex: {
@@ -109,7 +112,13 @@ export default function App() {
     const normalizedQuery = query.trim().toLowerCase();
     return snapshot.trackedSessions
       .filter((session) => {
-        if (filter !== "all" && session.status !== filter) return false;
+        if (
+          filter !== "all" &&
+          filter !== "archive" &&
+          session.status !== filter
+        ) {
+          return false;
+        }
         if (!normalizedQuery) return true;
         return [
           session.title,
@@ -133,6 +142,28 @@ export default function App() {
       });
   }, [filter, query, snapshot.trackedSessions]);
 
+  const visibleArchivedSessions = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return snapshot.archivedSessions
+      .filter((session) => {
+        if (!normalizedQuery) return true;
+        return [
+          session.title,
+          session.summary,
+          session.workingDirectory,
+          session.agent
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(normalizedQuery);
+      })
+      .sort(
+        (left, right) =>
+          new Date(right.archivedAt).getTime() -
+          new Date(left.archivedAt).getTime()
+      );
+  }, [query, snapshot.archivedSessions]);
+
   function showError(error: unknown) {
     setToast(error instanceof Error ? error.message : String(error));
   }
@@ -152,9 +183,38 @@ export default function App() {
     setSnapshot(await agentApi.trackSessions({ sessionIds }));
   };
 
-  const removeSession = async (sessionId: string) => {
+  const archiveSession = async (sessionId: string) => {
     try {
-      setSnapshot(await agentApi.untrackSession(sessionId));
+      setSnapshot(await agentApi.archiveSession(sessionId));
+      setToast("Czat przeniesiono do archiwum.");
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const restoreSession = async (sessionId: string) => {
+    try {
+      setSnapshot(await agentApi.restoreArchivedSession(sessionId));
+      setToast("Czat przywrócono do obserwowanych.");
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const deleteArchivedSession = async (sessionId: string) => {
+    const session = snapshot.archivedSessions.find(
+      (item) => item.id === sessionId
+    );
+    if (
+      !window.confirm(
+        `Usunąć „${session?.title ?? "ten czat"}” z archiwum AgentSignal?\n\nOryginalna rozmowa w Codex lub Claude Code pozostanie bez zmian.`
+      )
+    ) {
+      return;
+    }
+    try {
+      setSnapshot(await agentApi.deleteArchivedSession(sessionId));
+      setToast("Wpis usunięto z archiwum.");
     } catch (error) {
       showError(error);
     }
@@ -239,6 +299,13 @@ export default function App() {
             label="Wolne"
             onClick={() => setFilter("idle")}
           />
+          <NavButton
+            active={filter === "archive"}
+            count={snapshot.archivedSessions.length}
+            icon={<Archive size={16} />}
+            label="Archiwum"
+            onClick={() => setFilter("archive")}
+          />
         </nav>
 
         <div className="sidebar__spacer" />
@@ -291,10 +358,14 @@ export default function App() {
         <main className="workspace">
         <header className="page-header">
           <div>
-            <p className="eyebrow">Dashboard agentów</p>
-            <h1>Obserwowane czaty</h1>
+            <p className="eyebrow">
+              {filter === "archive" ? "Historia dashboardu" : "Dashboard agentów"}
+            </p>
+            <h1>{filter === "archive" ? "Archiwum" : "Obserwowane czaty"}</h1>
             <span>
-              Sesje Codex i Claude Code
+              {filter === "archive"
+                ? "Zakończone obserwowanie sesji"
+                : "Sesje Codex i Claude Code"}
             </span>
           </div>
           <div className="page-header__actions">
@@ -327,40 +398,92 @@ export default function App() {
                 size={17}
               />
             </button>
-            <button
-              className="button button--primary"
-              type="button"
-              onClick={() => setPickerOpen(true)}
-            >
-              <Plus size={16} />
-              Dodaj czat
-            </button>
+            {filter !== "archive" && (
+              <button
+                className="button button--primary"
+                type="button"
+                onClick={() => setPickerOpen(true)}
+              >
+                <Plus size={16} />
+                Dodaj czat
+              </button>
+            )}
           </div>
         </header>
 
-        <section className="status-summary">
-          <SummaryItem status="working" count={counts.working} />
-          <SummaryItem status="attention" count={counts.attention} />
-          <SummaryItem status="idle" count={counts.idle} />
-        </section>
+        {filter !== "archive" && (
+          <section className="status-summary">
+            <SummaryItem status="working" count={counts.working} />
+            <SummaryItem status="attention" count={counts.attention} />
+            <SummaryItem status="idle" count={counts.idle} />
+          </section>
+        )}
 
-        <div className="list-toolbar">
+        <div
+          className={`list-toolbar ${
+            filter === "archive" ? "list-toolbar--archive" : ""
+          }`}
+        >
           <label className="search-input search-input--page">
             <Search size={16} />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Szukaj obserwowanych czatów"
+              placeholder={
+                filter === "archive"
+                  ? "Szukaj w archiwum"
+                  : "Szukaj obserwowanych czatów"
+              }
             />
           </label>
           <span>
-            {visibleSessions.length}{" "}
-            {visibleSessions.length === 1 ? "czat" : "czatów"}
+            {filter === "archive"
+              ? `${visibleArchivedSessions.length} ${
+                  visibleArchivedSessions.length === 1 ? "wpis" : "wpisów"
+                }`
+              : `${visibleSessions.length} ${
+                  visibleSessions.length === 1 ? "czat" : "czatów"
+                }`}
           </span>
         </div>
 
         <section className="chat-list">
-          {visibleSessions.length > 0 ? (
+          {filter === "archive" ? (
+            visibleArchivedSessions.length > 0 ? (
+              <>
+                <div className="chat-list__header archive-list__header">
+                  <span>Czat</span>
+                  <span>Zarchiwizowano</span>
+                  <span>Akcje</span>
+                </div>
+                {visibleArchivedSessions.map((session) => (
+                  <ArchivedChatRow
+                    key={session.id}
+                    session={session}
+                    now={now}
+                    onRestore={restoreSession}
+                    onDelete={deleteArchivedSession}
+                  />
+                ))}
+              </>
+            ) : (
+              <div className="empty-state">
+                <span className="empty-state__icon">
+                  <Archive size={22} />
+                </span>
+                <h2>
+                  {snapshot.archivedSessions.length === 0
+                    ? "Archiwum jest puste"
+                    : "Brak wpisów pasujących do wyszukiwania"}
+                </h2>
+                <p>
+                  {snapshot.archivedSessions.length === 0
+                    ? "Archiwizuj zakończone czaty z widoku obserwowanych. Dopiero tutaj możesz usunąć wpis z AgentSignal."
+                    : "Zmień wyszukiwaną frazę."}
+                </p>
+              </div>
+            )
+          ) : visibleSessions.length > 0 ? (
             <>
               <div className="chat-list__header">
                 <span>Czat</span>
@@ -372,7 +495,7 @@ export default function App() {
                   key={session.id}
                   session={session}
                   now={now}
-                  onRemove={removeSession}
+                  onArchive={archiveSession}
                 />
               ))}
             </>
