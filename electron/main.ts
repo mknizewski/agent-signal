@@ -25,6 +25,10 @@ import { isProjectColor } from "../src/shared/project-groups";
 import { DashboardManager } from "./services/dashboard-manager";
 import { MobileGateway } from "./services/mobile-gateway";
 import { MobileStore } from "./services/mobile-store";
+import {
+  APPROVAL_NOTIFICATION_DELAY_MS,
+  NotificationDebouncer
+} from "./services/notification-debouncer";
 import { TrackingStore } from "./services/store";
 import { resolveClaudeExecutable } from "./services/detector";
 
@@ -34,9 +38,13 @@ let mobileGateway: MobileGateway | null = null;
 let tray: Tray | null = null;
 let quitting = false;
 let notificationsReady = false;
+let latestNotificationSnapshot: AppSnapshot | undefined;
 let normalWindowBounds: Electron.Rectangle | undefined;
 let trayLanguage: AppPreferences["language"] = "pl";
 const lastStatuses = new Map<string, SessionStatus>();
+const approvalNotificationDebouncer = new NotificationDebouncer(
+  APPROVAL_NOTIFICATION_DELAY_MS
+);
 const smokeMode = process.argv.includes("--smoke-test");
 
 const lock = app.requestSingleInstanceLock();
@@ -114,6 +122,7 @@ app.on("before-quit", (event) => {
   if (quitting) return;
   event.preventDefault();
   quitting = true;
+  approvalNotificationDebouncer.clear();
   void Promise.all([
     dashboardManager?.shutdown() ?? Promise.resolve(),
     mobileGateway?.stop() ?? Promise.resolve()
@@ -324,15 +333,28 @@ function setCompactWindow(compact: boolean): void {
 }
 
 function publishSnapshot(snapshot: AppSnapshot): void {
+  latestNotificationSnapshot = snapshot;
   mainWindow?.webContents.send("snapshot:changed", snapshot);
   mobileGateway?.publishSnapshot(snapshot);
   if (trayLanguage !== snapshot.preferences.language) {
     updateTrayMenu(snapshot.preferences.language);
   }
 
+  const trackedSessionIds = new Set(
+    snapshot.trackedSessions.map((session) => session.id)
+  );
+  approvalNotificationDebouncer.cancelExcept(trackedSessionIds);
   for (const session of snapshot.trackedSessions) {
     const previous = lastStatuses.get(session.id);
     lastStatuses.set(session.id, session.status);
+    if (
+      session.status !== "attention" ||
+      !snapshot.preferences.systemNotifications ||
+      !snapshot.preferences.approvalNotifications ||
+      !notificationsReady
+    ) {
+      approvalNotificationDebouncer.cancel(session.id);
+    }
     if (
       !snapshot.preferences.systemNotifications ||
       !notificationsReady ||
@@ -346,12 +368,26 @@ function publishSnapshot(snapshot: AppSnapshot): void {
       session.status === "attention" &&
       snapshot.preferences.approvalNotifications
     ) {
-      showNotification(
-        snapshot.preferences.language === "pl"
-          ? "Agent Signal · do zatwierdzenia"
-          : "Agent Signal · approval needed",
-        session.title
-      );
+      approvalNotificationDebouncer.schedule(session.id, () => {
+        const currentSnapshot = latestNotificationSnapshot;
+        const currentSession = currentSnapshot?.trackedSessions.find(
+          (candidate) => candidate.id === session.id
+        );
+        if (
+          !currentSnapshot ||
+          currentSession?.status !== "attention" ||
+          !currentSnapshot.preferences.systemNotifications ||
+          !currentSnapshot.preferences.approvalNotifications
+        ) {
+          return;
+        }
+        showNotification(
+          currentSnapshot.preferences.language === "pl"
+            ? "Agent Signal · do zatwierdzenia"
+            : "Agent Signal · approval needed",
+          currentSession.title
+        );
+      });
     } else if (session.status === "idle" && previous === "working") {
       showNotification(
         snapshot.preferences.language === "pl"
@@ -360,6 +396,9 @@ function publishSnapshot(snapshot: AppSnapshot): void {
         session.title
       );
     }
+  }
+  for (const sessionId of lastStatuses.keys()) {
+    if (!trackedSessionIds.has(sessionId)) lastStatuses.delete(sessionId);
   }
 }
 

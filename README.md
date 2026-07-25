@@ -43,7 +43,8 @@ Version 0.6.1 turns the flat watch list into a configurable project workspace:
 - naturally written Polish and English interface copy;
 - sleeping pets after a configurable idle period, set to 15 minutes by default;
 - a corrected approval state that requires an explicit approval or input signal;
-- optional muting of approval-wait notifications without hiding the status;
+- a 10-second grace period and optional muting for approval-wait notifications,
+  without delaying or hiding the dashboard status;
 - larger, higher-contrast UI text, including the mobile-device dialog;
 - a refined Codex pet and hammer animation with no clipped swing;
 - a clearer Agent Signal application icon and correctly separated product name
@@ -105,9 +106,10 @@ input tool call is still unresolved. Ordinary reasoning, a running command, or
 a quiet log never becomes an approval wait merely because time has passed.
 
 When an approval request is resolved, the dashboard returns to the real current
-state. Approval notifications can also be muted separately on desktop and
-paired phones, which is useful for brief waits that the source application
-handles automatically. The yellow dashboard status remains visible.
+state. Desktop and mobile notifications wait 10 seconds before firing; a brief
+wait resolved by automatic approval is therefore silent. Alerts can also be
+muted completely. The yellow dashboard status itself remains immediate and
+visible.
 
 Claude Code history comes from the official Claude Agent SDK. Its active state
 is currently inferred from the time of the most recent session activity.

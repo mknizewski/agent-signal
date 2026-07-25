@@ -145,7 +145,7 @@ const translations = {
         "Informuje o oczekującym zatwierdzeniu i zakończonej pracy.",
       approvalNotifications: "Alerty o oczekiwaniu na zatwierdzenie",
       approvalNotificationsDescription:
-        "Wyłącz, aby wyciszyć krótkie alerty desktopowe i mobilne dla tego statusu.",
+        "Alert przychodzi dopiero, gdy status utrzyma się 10 sekund. Możesz go całkowicie wyciszyć.",
       petTitle: "Pupil i bezczynność",
       sleepingPet: "Pokazuj śpiącego pupila",
       sleepingPetDescription:
@@ -373,7 +373,7 @@ const translations = {
         "Notifies you when a session needs approval or finishes working.",
       approvalNotifications: "Approval-wait alerts",
       approvalNotificationsDescription:
-        "Turn off brief desktop and mobile alerts for this status.",
+        "Alerts wait 10 seconds for the status to persist. Turn them off to mute them completely.",
       petTitle: "Pet and idle behavior",
       sleepingPet: "Show sleeping pets",
       sleepingPetDescription:

@@ -28,6 +28,10 @@ import {
 import { MobilePairingRegistry } from "./mobile-pairing";
 import { mobileNotificationForTransition } from "./mobile-notifications";
 import {
+  APPROVAL_NOTIFICATION_DELAY_MS,
+  NotificationDebouncer
+} from "./notification-debouncer";
+import {
   createEmptyMobileState,
   type MobileState,
   type StoredMobileDevice,
@@ -76,6 +80,9 @@ export class MobileGateway {
   private readonly pairingFailures = new Map<string, PairingFailureWindow>();
   private readonly eventClients = new Set<EventClient>();
   private previousStatuses?: Map<string, SessionStatus>;
+  private readonly approvalNotificationDebouncer = new NotificationDebouncer(
+    APPROVAL_NOTIFICATION_DELAY_MS
+  );
   private saveQueue = Promise.resolve();
   private heartbeat?: NodeJS.Timeout;
   private error?: string;
@@ -303,6 +310,7 @@ export class MobileGateway {
   }
 
   private async stopServers(): Promise<void> {
+    this.approvalNotificationDebouncer.clear();
     if (this.heartbeat) clearInterval(this.heartbeat);
     this.heartbeat = undefined;
     this.pairingRegistry.clear();
@@ -603,15 +611,53 @@ export class MobileGateway {
     this.previousStatuses = current;
     if (!previous || !this.state.enabled || !this.state.vapid) return;
 
+    const trackedSessionIds = new Set(
+      snapshot.trackedSessions.map((session) => session.id)
+    );
+    this.approvalNotificationDebouncer.cancelExcept(trackedSessionIds);
     for (const session of snapshot.trackedSessions) {
       const before = previous.get(session.id);
+      if (
+        session.status !== "attention" ||
+        !snapshot.preferences.approvalNotifications
+      ) {
+        this.approvalNotificationDebouncer.cancel(session.id);
+      }
       const payload = mobileNotificationForTransition(
         before,
         session.status,
         session.title,
         snapshot.preferences.approvalNotifications
       );
-      if (payload) await this.sendPushToDevices(payload);
+      if (!payload) continue;
+      if (payload.status !== "attention") {
+        await this.sendPushToDevices(payload);
+        continue;
+      }
+      this.approvalNotificationDebouncer.schedule(session.id, () => {
+        const currentSnapshot = this.latestSnapshot;
+        const currentSession = currentSnapshot?.trackedSessions.find(
+          (candidate) => candidate.id === session.id
+        );
+        if (
+          !currentSnapshot ||
+          currentSession?.status !== "attention" ||
+          !currentSnapshot.preferences.approvalNotifications ||
+          !this.state.enabled ||
+          !this.state.vapid
+        ) {
+          return;
+        }
+        void this.sendPushToDevices({
+          ...payload,
+          body: currentSession.title
+        }).catch((error) => {
+          this.options.onDiagnostic?.(
+            "Nie udało się wysłać opóźnionego powiadomienia.",
+            error
+          );
+        });
+      });
     }
   }
 
