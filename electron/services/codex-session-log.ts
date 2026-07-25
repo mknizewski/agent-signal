@@ -1,11 +1,12 @@
 import { open, readFile, stat } from "node:fs/promises";
 import type { CodexExternalThread } from "../../src/shared/external-sessions";
 
-export type CodexLogActivity = "working" | "idle" | "unknown";
+export type CodexLogActivity = "working" | "attention" | "idle" | "unknown";
 
 export interface CodexLogState {
   activity: CodexLogActivity;
   activeTurnId?: string;
+  pendingAttentionCallIds?: string[];
 }
 
 interface CachedLogState extends CodexLogState {
@@ -98,6 +99,11 @@ export class CodexSessionLogTracker {
     const next = reduceCodexLogLines(lines, state);
     state.activity = next.activity;
     state.activeTurnId = next.activeTurnId;
+    if (next.pendingAttentionCallIds?.length) {
+      state.pendingAttentionCallIds = next.pendingAttentionCallIds;
+    } else {
+      delete state.pendingAttentionCallIds;
+    }
   }
 }
 
@@ -111,7 +117,11 @@ export function reduceCodexLogLines(
     if (
       !line.includes('"task_started"') &&
       !line.includes('"task_complete"') &&
-      !line.includes('"turn_aborted"')
+      !line.includes('"turn_aborted"') &&
+      !line.includes('"function_call"') &&
+      !line.includes('"function_call_output"') &&
+      !line.includes('"custom_tool_call"') &&
+      !line.includes('"custom_tool_call_output"')
     ) {
       continue;
     }
@@ -119,22 +129,58 @@ export function reduceCodexLogLines(
     try {
       const entry = JSON.parse(line) as {
         type?: string;
-        payload?: { type?: string; turn_id?: string };
+        payload?: {
+          type?: string;
+          turn_id?: string;
+          call_id?: string;
+          name?: string;
+          arguments?: string;
+          input?: string;
+        };
       };
-      if (entry.type !== "event_msg") continue;
 
       const eventType = entry.payload?.type;
       const turnId = entry.payload?.turn_id;
-      if (eventType === "task_started") {
+      if (entry.type === "event_msg" && eventType === "task_started") {
         state.activity = "working";
         state.activeTurnId = turnId;
+        delete state.pendingAttentionCallIds;
       } else if (
-        eventType === "task_complete" ||
-        eventType === "turn_aborted"
+        entry.type === "event_msg" &&
+        (eventType === "task_complete" || eventType === "turn_aborted")
       ) {
         if (!state.activeTurnId || !turnId || state.activeTurnId === turnId) {
           state.activity = "idle";
           state.activeTurnId = undefined;
+          delete state.pendingAttentionCallIds;
+        }
+      } else if (
+        entry.type === "response_item" &&
+        isInteractiveCall(entry.payload)
+      ) {
+        const callId = entry.payload?.call_id;
+        if (!callId) continue;
+        const pending = new Set(state.pendingAttentionCallIds ?? []);
+        pending.add(callId);
+        state.pendingAttentionCallIds = [...pending];
+        state.activity = "attention";
+      } else if (
+        entry.type === "response_item" &&
+        isCallOutput(eventType)
+      ) {
+        const callId = entry.payload?.call_id;
+        if (!callId || !state.pendingAttentionCallIds?.includes(callId)) {
+          continue;
+        }
+        const pending = state.pendingAttentionCallIds.filter(
+          (candidate) => candidate !== callId
+        );
+        if (pending.length > 0) {
+          state.pendingAttentionCallIds = pending;
+          state.activity = "attention";
+        } else {
+          delete state.pendingAttentionCallIds;
+          state.activity = state.activeTurnId ? "working" : "unknown";
         }
       }
     } catch {
@@ -143,4 +189,49 @@ export function reduceCodexLogLines(
   }
 
   return state;
+}
+
+function isInteractiveCall(
+  payload:
+    | {
+        type?: string;
+        name?: string;
+        arguments?: string;
+        input?: string;
+      }
+    | undefined
+): boolean {
+  if (
+    payload?.type !== "function_call" &&
+    payload?.type !== "custom_tool_call"
+  ) {
+    return false;
+  }
+
+  const name = payload.name?.trim().toLowerCase();
+  if (
+    name === "request_user_input" ||
+    name === "request_permissions" ||
+    name === "request_permission"
+  ) {
+    return true;
+  }
+
+  const rawArguments =
+    payload.type === "custom_tool_call" ? payload.input : payload.arguments;
+  if (!rawArguments) return false;
+  try {
+    const parsed = JSON.parse(rawArguments) as {
+      sandbox_permissions?: unknown;
+    };
+    return parsed.sandbox_permissions === "require_escalated";
+  } catch {
+    return false;
+  }
+}
+
+function isCallOutput(type?: string): boolean {
+  return (
+    type === "function_call_output" || type === "custom_tool_call_output"
+  );
 }

@@ -3,6 +3,7 @@ import type {
   AppSnapshot,
   ArchivedSessionRecord,
   DiscoveredSession,
+  MobileGatewayStatus,
   TrackSessionsInput,
   TrackedSession
 } from "../shared/types";
@@ -89,6 +90,12 @@ let demoSnapshot: AppSnapshot = {
 };
 
 const demoListeners = new Set<(snapshot: AppSnapshot) => void>();
+const demoMobileListeners = new Set<(status: MobileGatewayStatus) => void>();
+let demoMobileStatus: MobileGatewayStatus = {
+  enabled: false,
+  running: false,
+  devices: []
+};
 
 function emitDemo(): void {
   demoSnapshot = { ...demoSnapshot, updatedAt: new Date().toISOString() };
@@ -181,9 +188,43 @@ const demoApi: AgentSignalApi = {
   setCompactMode: async () => undefined,
   setWindowTheme: async () => undefined,
   exitApp: async () => undefined,
+  getMobileGatewayStatus: async () => demoMobileStatus,
+  setMobileGatewayEnabled: async (enabled) => {
+    demoMobileStatus = {
+      ...demoMobileStatus,
+      enabled,
+      running: enabled,
+      address: enabled ? "192.168.1.20" : undefined,
+      hostname: enabled ? "agentsignal-demo.local" : undefined,
+      origin: enabled ? "https://agentsignal-demo.local:47831" : undefined,
+      certificateFingerprint: enabled
+        ? "DE:MO:00:00:00:00"
+        : undefined
+    };
+    for (const listener of demoMobileListeners) listener(demoMobileStatus);
+    return demoMobileStatus;
+  },
+  createMobilePairing: async () => ({
+    certificateUrl: "http://192.168.1.20:47830/",
+    certificateQrDataUrl: "",
+    pairingUrl: "https://agentsignal-demo.local:47831/pair#pair=demo",
+    pairingQrDataUrl: "",
+    certificateFingerprint: "DE:MO:00:00:00:00",
+    expiresAt: new Date(Date.now() + 60_000).toISOString()
+  }),
+  revokeMobileDevice: async () => demoMobileStatus,
+  resetMobileAccess: async () => {
+    demoMobileStatus = { enabled: false, running: false, devices: [] };
+    for (const listener of demoMobileListeners) listener(demoMobileStatus);
+    return demoMobileStatus;
+  },
   onSnapshot: (listener) => {
     demoListeners.add(listener);
     return () => demoListeners.delete(listener);
+  },
+  onMobileGatewayStatus: (listener) => {
+    demoMobileListeners.add(listener);
+    return () => demoMobileListeners.delete(listener);
   }
 };
 

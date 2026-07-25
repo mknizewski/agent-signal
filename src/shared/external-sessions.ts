@@ -14,7 +14,7 @@ export interface CodexExternalThread {
   createdAt?: number | string | null;
   updatedAt?: number | string | null;
   status?: CodexThreadStatus | null;
-  logActivity?: "working" | "idle" | "unknown";
+  logActivity?: "working" | "attention" | "idle" | "unknown";
 }
 
 export interface ClaudeExternalSession {
@@ -105,8 +105,9 @@ function codexStatus(
   ) {
     return "attention";
   }
-  if (runtimeStatus === "active") return "working";
   if (runtimeStatus === "systemError") return "error";
+  if (thread.logActivity === "attention") return "attention";
+  if (runtimeStatus === "active") return "working";
   if (thread.logActivity === "working") return "working";
   if (thread.logActivity === "idle") return "idle";
   if (runtimeStatus === "idle") return "idle";
