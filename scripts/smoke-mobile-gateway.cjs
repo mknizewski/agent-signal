@@ -35,7 +35,10 @@ async function main() {
     assert.ok(status.address);
     await assertMdnsAddress(status.hostname, status.address);
     const pairing = await gateway.createPairing();
-    const secret = new URL(pairing.pairingUrl).hash.replace("#pair=", "");
+    const pairingUrl = new URL(pairing.pairingUrl);
+    assert.equal(pairingUrl.hostname, status.address);
+    assert.equal(pairingUrl.protocol, "https:");
+    const secret = pairingUrl.hash.replace("#pair=", "");
     assert.ok(secret);
 
     const paired = await request(status.address, "/api/v1/pair", {

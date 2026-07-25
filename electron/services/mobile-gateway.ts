@@ -142,8 +142,12 @@ export class MobileGateway {
 
     const { secret, expiresAt } = this.pairingRegistry.create();
     const certificateUrl = `http://${network.address}:${BOOTSTRAP_PORT}/`;
+    // Android/Chrome does not resolve arbitrary .local names reliably on every
+    // network (notably with Private DNS enabled). The server certificate also
+    // contains the selected private IPv4 address, so use it as the canonical
+    // pairing origin and keep mDNS only as an optional convenience.
     const pairingUrl =
-      `https://${certificates.hostname}:${HTTPS_PORT}/pair#pair=${secret}`;
+      `https://${network.address}:${HTTPS_PORT}/pair#pair=${secret}`;
 
     return {
       certificateUrl,

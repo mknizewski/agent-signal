@@ -89,7 +89,9 @@ To connect a phone:
    certificate, and install it from Android settings as a CA certificate.
 5. Verify that the SHA-256 fingerprint shown by Android matches the value in
    AgentSignal.
-6. Continue to the pairing step and scan the second, one-time QR code.
+6. Continue to the pairing step and scan the second, one-time QR code. The QR
+   uses the computer's private IPv4 address directly, so Android does not need
+   to resolve a `.local` hostname.
 7. In Chrome, choose **Add to Home screen** or **Install app**.
 8. Open the installed app and enable notifications.
 
@@ -215,7 +217,9 @@ build/           application icon
 - The current installer targets Windows x64.
 - The mobile dashboard currently targets Android 12+ and works only within the
   same private IPv4 subnet.
-- Some guest Wi-Fi networks block device-to-device traffic or mDNS discovery.
+- Some guest Wi-Fi networks block device-to-device traffic. AgentSignal uses
+  the computer's private IPv4 address for pairing and does not depend on mDNS
+  name resolution on Android.
 - Background mobile notifications require internet access to the browser's
   Web Push service.
 
