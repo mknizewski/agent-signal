@@ -5,18 +5,25 @@ import {
   ipcMain,
   Menu,
   Notification,
-  session
+  safeStorage,
+  session,
+  Tray
 } from "electron";
 import type {
   AppSnapshot,
+  MobileGatewayStatus,
   SessionStatus,
   TrackSessionsInput
 } from "../src/shared/types";
 import { DashboardManager } from "./services/dashboard-manager";
+import { MobileGateway } from "./services/mobile-gateway";
+import { MobileStore } from "./services/mobile-store";
 import { TrackingStore } from "./services/store";
 
 let mainWindow: BrowserWindow | null = null;
 let dashboardManager: DashboardManager | null = null;
+let mobileGateway: MobileGateway | null = null;
+let tray: Tray | null = null;
 let quitting = false;
 let notificationsReady = false;
 let normalWindowBounds: Electron.Rectangle | undefined;
@@ -40,9 +47,37 @@ app.whenReady().then(async () => {
     (_webContents, _permission, callback) => callback(false)
   );
   createWindow();
+  createTray();
   registerIpc();
 
-  const store = new TrackingStore(app.getPath("userData"));
+  const userDataPath = app.getPath("userData");
+  mobileGateway = new MobileGateway({
+    store: new MobileStore(userDataPath),
+    assetRoot: path.join(app.getAppPath(), "dist"),
+    protector: {
+      protect: (value) => {
+        if (!safeStorage.isEncryptionAvailable()) {
+          throw new Error(
+            "Systemowe szyfrowanie sekretów nie jest obecnie dostępne."
+          );
+        }
+        return safeStorage.encryptString(value).toString("base64");
+      },
+      unprotect: (value) => {
+        if (!safeStorage.isEncryptionAvailable()) {
+          throw new Error(
+            "Systemowe szyfrowanie sekretów nie jest obecnie dostępne."
+          );
+        }
+        return safeStorage.decryptString(Buffer.from(value, "base64"));
+      }
+    },
+    onStatus: publishMobileGatewayStatus,
+    onDiagnostic: (message, error) => console.warn(message, error)
+  });
+  await mobileGateway.initialize();
+
+  const store = new TrackingStore(userDataPath);
   dashboardManager = new DashboardManager(store, publishSnapshot);
   await dashboardManager.initialize();
   notificationsReady = true;
@@ -54,10 +89,13 @@ app.whenReady().then(async () => {
 });
 
 app.on("before-quit", (event) => {
-  if (quitting || !dashboardManager) return;
+  if (quitting) return;
   event.preventDefault();
   quitting = true;
-  void dashboardManager.shutdown().finally(() => app.quit());
+  void Promise.all([
+    dashboardManager?.shutdown() ?? Promise.resolve(),
+    mobileGateway?.stop() ?? Promise.resolve()
+  ]).finally(() => app.quit());
 });
 
 app.on("window-all-closed", () => {
@@ -93,6 +131,12 @@ function createWindow(): void {
     if (!smokeMode) mainWindow?.show();
   });
 
+  mainWindow.on("close", (event) => {
+    if (quitting || smokeMode) return;
+    event.preventDefault();
+    mainWindow?.hide();
+  });
+
   mainWindow.webContents.once("did-finish-load", () => {
     if (!smokeMode) return;
     setTimeout(() => {
@@ -114,6 +158,32 @@ function createWindow(): void {
     const current = mainWindow?.webContents.getURL();
     if (current && url !== current) event.preventDefault();
   });
+}
+
+function createTray(): void {
+  tray = new Tray(path.join(app.getAppPath(), "build", "icon.ico"));
+  tray.setToolTip("AgentSignal");
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: "Otwórz AgentSignal",
+        click: showMainWindow
+      },
+      { type: "separator" },
+      {
+        label: "Wyjście",
+        click: () => app.quit()
+      }
+    ])
+  );
+  tray.on("double-click", showMainWindow);
+}
+
+function showMainWindow(): void {
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
 }
 
 function registerIpc(): void {
@@ -150,6 +220,20 @@ function registerIpc(): void {
     });
   });
   ipcMain.handle("app:exit", () => app.quit());
+  ipcMain.handle("mobile:status", () => requireMobileGateway().getStatus());
+  ipcMain.handle("mobile:set-enabled", (_event, enabled: unknown) => {
+    if (typeof enabled !== "boolean") {
+      throw new TypeError("Nieprawidłowy stan dostępu mobilnego.");
+    }
+    return requireMobileGateway().setEnabled(enabled);
+  });
+  ipcMain.handle("mobile:create-pairing", () =>
+    requireMobileGateway().createPairing()
+  );
+  ipcMain.handle("mobile:revoke-device", (_event, deviceId: unknown) =>
+    requireMobileGateway().revokeDevice(parseDeviceId(deviceId))
+  );
+  ipcMain.handle("mobile:reset", () => requireMobileGateway().reset());
 }
 
 function setCompactWindow(compact: boolean): void {
@@ -177,6 +261,7 @@ function setCompactWindow(compact: boolean): void {
 
 function publishSnapshot(snapshot: AppSnapshot): void {
   mainWindow?.webContents.send("snapshot:changed", snapshot);
+  mobileGateway?.publishSnapshot(snapshot);
 
   for (const session of snapshot.trackedSessions) {
     const previous = lastStatuses.get(session.id);
@@ -193,6 +278,10 @@ function publishSnapshot(snapshot: AppSnapshot): void {
   }
 }
 
+function publishMobileGatewayStatus(status: MobileGatewayStatus): void {
+  mainWindow?.webContents.send("mobile:status-changed", status);
+}
+
 function showNotification(title: string, body: string): void {
   if (!Notification.isSupported()) return;
   const notification = new Notification({ title, body });
@@ -206,6 +295,13 @@ function showNotification(title: string, body: string): void {
 function requireManager(): DashboardManager {
   if (!dashboardManager) throw new Error("AgentSignal jeszcze się uruchamia.");
   return dashboardManager;
+}
+
+function requireMobileGateway(): MobileGateway {
+  if (!mobileGateway) {
+    throw new Error("Dostęp mobilny jeszcze się uruchamia.");
+  }
+  return mobileGateway;
 }
 
 function resolveDevelopmentUrl(): string | undefined {
@@ -250,6 +346,17 @@ function parseSessionId(value: unknown): string {
     value.length > 512
   ) {
     throw new TypeError("Nieprawidłowy identyfikator czatu.");
+  }
+  return value;
+}
+
+function parseDeviceId(value: unknown): string {
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    value.length > 128
+  ) {
+    throw new TypeError("Nieprawidłowy identyfikator urządzenia.");
   }
   return value;
 }

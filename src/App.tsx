@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Search,
   SlidersHorizontal,
+  Smartphone,
   Sun
 } from "lucide-react";
 import { agentApi, isDemoMode } from "./lib/api";
@@ -23,6 +24,7 @@ import { ArchivedChatRow } from "./components/ArchivedChatRow";
 import { AppTitleBar } from "./components/AppTitleBar";
 import { ChatPickerModal } from "./components/ChatPickerModal";
 import { CompactDashboard } from "./components/CompactDashboard";
+import { MobileDevicesModal } from "./components/MobileDevicesModal";
 import { TrackedChatRow } from "./components/TrackedChatRow";
 
 type ViewFilter = "all" | "working" | "attention" | "idle" | "archive";
@@ -56,6 +58,7 @@ export default function App() {
   const [filter, setFilter] = useState<ViewFilter>("all");
   const [query, setQuery] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [mobileDevicesOpen, setMobileDevicesOpen] = useState(false);
   const [now, setNow] = useState(new Date());
   const [toast, setToast] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -372,6 +375,15 @@ export default function App() {
             <button
               className="icon-button icon-button--bordered"
               type="button"
+              title="Urządzenia mobilne"
+              aria-label="Urządzenia mobilne"
+              onClick={() => setMobileDevicesOpen(true)}
+            >
+              <Smartphone size={17} />
+            </button>
+            <button
+              className="icon-button icon-button--bordered"
+              type="button"
               title={
                 theme === "dark"
                   ? "Włącz jasny motyw"
@@ -538,6 +550,11 @@ export default function App() {
         providers={snapshot.providers}
         onClose={() => setPickerOpen(false)}
         onAdd={addSessions}
+      />
+
+      <MobileDevicesModal
+        open={mobileDevicesOpen}
+        onClose={() => setMobileDevicesOpen(false)}
       />
 
       {toast && (
