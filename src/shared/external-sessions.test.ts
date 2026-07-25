@@ -69,6 +69,21 @@ describe("external session mapping", () => {
     expect(session.status).toBe("working");
   });
 
+  it("prefers an approval detected in the log over an active runtime without flags", () => {
+    const session = mapCodexThread(
+      {
+        id: "thread-approval-log",
+        preview: "Uruchom komendę",
+        updatedAt: now.getTime(),
+        status: { type: "active", activeFlags: [] },
+        logActivity: "attention"
+      },
+      now
+    );
+
+    expect(session.status).toBe("attention");
+  });
+
   it("does not show a stale unknown Codex thread as free", () => {
     const session = mapCodexThread(
       {

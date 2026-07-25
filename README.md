@@ -118,8 +118,11 @@ credentials.
 
 Codex exposes its session list through the local App Server. For tracked
 conversations, AgentSignal also reads `task_started`, `task_complete`, and
-`turn_aborted` events from the local JSONL history. This keeps long-running
-tasks marked as active even when the log is briefly quiet.
+`turn_aborted` events from the local JSONL history. Pending
+`request_user_input` calls and commands requesting elevated permission are
+tracked until their matching response, so approval prompts switch the session
+to **Needs attention**. This also keeps long-running tasks marked as active
+even when the log is briefly quiet.
 
 Claude Code exposes local history through the official SDK's `listSessions`
 method. Its working state is inferred from the time of the latest session
