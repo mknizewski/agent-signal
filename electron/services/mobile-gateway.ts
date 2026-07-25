@@ -608,7 +608,8 @@ export class MobileGateway {
       const payload = mobileNotificationForTransition(
         before,
         session.status,
-        session.title
+        session.title,
+        snapshot.preferences.approvalNotifications
       );
       if (payload) await this.sendPushToDevices(payload);
     }

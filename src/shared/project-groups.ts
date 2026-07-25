@@ -16,6 +16,7 @@ export interface ProjectGroupPresentation {
   name: string;
   symbol: string;
   color: string;
+  collapsed: boolean;
   order: number;
 }
 
@@ -36,6 +37,7 @@ export function groupSessionsByProject<T extends { projectName: string }>(
         name: "all",
         symbol: "A",
         color: PROJECT_COLORS[0],
+        collapsed: false,
         order: 0,
         sessions
       }
@@ -73,6 +75,7 @@ export function resolveProjectGroup(
       config?.color && isProjectColor(config.color)
         ? config.color
         : defaultProjectColor(projectKey || fallbackName),
+    collapsed: config?.collapsed === true,
     order:
       typeof config?.order === "number" && Number.isFinite(config.order)
         ? config.order
@@ -112,6 +115,7 @@ export function normalizeProjectGroupConfigs(
       ...(label ? { label } : {}),
       ...(symbol ? { symbol } : {}),
       ...(color ? { color } : {}),
+      ...(candidate.collapsed === true ? { collapsed: true } : {}),
       order:
         typeof candidate.order === "number" &&
         Number.isFinite(candidate.order)

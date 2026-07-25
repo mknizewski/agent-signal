@@ -342,7 +342,10 @@ function publishSnapshot(snapshot: AppSnapshot): void {
       continue;
     }
 
-    if (session.status === "attention") {
+    if (
+      session.status === "attention" &&
+      snapshot.preferences.approvalNotifications
+    ) {
       showNotification(
         snapshot.preferences.language === "pl"
           ? "Agent Signal · do zatwierdzenia"
@@ -580,7 +583,8 @@ function parsePreferencesPatch(input: unknown): Partial<AppPreferences> {
     "idlePetAnimation",
     "detectNewSessions",
     "promptForNewSessions",
-    "systemNotifications"
+    "systemNotifications",
+    "approvalNotifications"
   ] as const;
   for (const key of booleanKeys) {
     if (candidate[key] === undefined) continue;
@@ -616,21 +620,44 @@ function parseUpdateProjectGroupInput(
   const candidate = input as Record<string, unknown>;
   if (
     typeof candidate.projectKey !== "string" ||
-    candidate.projectKey.length > 80 ||
-    typeof candidate.label !== "string" ||
-    candidate.label.length > 80 ||
-    typeof candidate.symbol !== "string" ||
-    [...candidate.symbol.trim()].length > 2 ||
-    typeof candidate.color !== "string" ||
-    (candidate.color !== "" && !isProjectColor(candidate.color))
+    candidate.projectKey.length > 80
   ) {
     throw new TypeError("Nieprawidłowe dane grupy projektu.");
   }
+  if (
+    candidate.label !== undefined &&
+    (typeof candidate.label !== "string" || candidate.label.length > 80)
+  ) {
+    throw new TypeError("Nieprawidłowa nazwa grupy projektu.");
+  }
+  if (
+    candidate.symbol !== undefined &&
+    (typeof candidate.symbol !== "string" ||
+      [...candidate.symbol.trim()].length > 2)
+  ) {
+    throw new TypeError("Nieprawidłowa litera grupy projektu.");
+  }
+  if (
+    candidate.color !== undefined &&
+    (typeof candidate.color !== "string" ||
+      (candidate.color !== "" && !isProjectColor(candidate.color)))
+  ) {
+    throw new TypeError("Nieprawidłowy kolor grupy projektu.");
+  }
+  if (
+    candidate.collapsed !== undefined &&
+    typeof candidate.collapsed !== "boolean"
+  ) {
+    throw new TypeError("Nieprawidłowy stan grupy projektu.");
+  }
   return {
     projectKey: candidate.projectKey,
-    label: candidate.label,
-    symbol: candidate.symbol,
-    color: candidate.color
+    ...(candidate.label === undefined ? {} : { label: candidate.label }),
+    ...(candidate.symbol === undefined ? {} : { symbol: candidate.symbol }),
+    ...(candidate.color === undefined ? {} : { color: candidate.color }),
+    ...(candidate.collapsed === undefined
+      ? {}
+      : { collapsed: candidate.collapsed })
   };
 }
 

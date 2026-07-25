@@ -12,7 +12,8 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   idleAfterMinutes: 15,
   detectNewSessions: true,
   promptForNewSessions: true,
-  systemNotifications: true
+  systemNotifications: true,
+  approvalNotifications: true
 };
 
 export function normalizePreferences(

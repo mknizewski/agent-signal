@@ -115,6 +115,12 @@ export function SettingsView({
           description={copy.settings.notificationsDescription}
           onChange={(value) => onUpdate({ systemNotifications: value })}
         />
+        <PreferenceToggle
+          checked={preferences.approvalNotifications}
+          label={copy.settings.approvalNotifications}
+          description={copy.settings.approvalNotificationsDescription}
+          onChange={(value) => onUpdate({ approvalNotifications: value })}
+        />
       </SettingsCard>
 
       <SettingsCard

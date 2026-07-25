@@ -68,6 +68,7 @@ describe("TrackingStore", () => {
           label: "Payments",
           symbol: "P",
           color: "#6f82e8",
+          collapsed: true,
           order: 0
         }
       ]
@@ -90,6 +91,7 @@ describe("TrackingStore", () => {
           label: "Payments",
           symbol: "P",
           color: "#6f82e8",
+          collapsed: true,
           order: 0
         }
       ]

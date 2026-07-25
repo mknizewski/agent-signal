@@ -22,6 +22,24 @@ describe("mobileNotificationForTransition", () => {
     });
   });
 
+  it("can mute approval notifications without muting completion", () => {
+    expect(
+      mobileNotificationForTransition(
+        "working",
+        "attention",
+        "Płatności",
+        false
+      )
+    ).toBeUndefined();
+    expect(
+      mobileNotificationForTransition("working", "idle", "Płatności", false)
+    ).toEqual({
+      title: "Agent Signal · agent jest wolny",
+      body: "Płatności",
+      status: "idle"
+    });
+  });
+
   it("does not notify for the initial or unrelated transitions", () => {
     expect(
       mobileNotificationForTransition(undefined, "attention", "Płatności")

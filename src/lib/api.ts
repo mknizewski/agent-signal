@@ -237,19 +237,34 @@ const demoApi: AgentSignalApi = {
     const existing = demoSnapshot.projectGroups.find(
       (group) => group.projectKey === input.projectKey
     );
+    const next = {
+      ...existing,
+      projectKey: input.projectKey,
+      order: existing?.order ?? demoSnapshot.projectGroups.length
+    };
+    if (input.label !== undefined) {
+      if (input.label.trim()) next.label = input.label.trim();
+      else delete next.label;
+    }
+    if (input.symbol !== undefined) {
+      if (input.symbol.trim()) next.symbol = input.symbol.trim();
+      else delete next.symbol;
+    }
+    if (input.color !== undefined) {
+      if (input.color) next.color = input.color;
+      else delete next.color;
+    }
+    if (input.collapsed !== undefined) {
+      if (input.collapsed) next.collapsed = true;
+      else delete next.collapsed;
+    }
     demoSnapshot = {
       ...demoSnapshot,
       projectGroups: [
         ...demoSnapshot.projectGroups.filter(
           (group) => group.projectKey !== input.projectKey
         ),
-        {
-          projectKey: input.projectKey,
-          order: existing?.order ?? demoSnapshot.projectGroups.length,
-          ...(input.label.trim() ? { label: input.label.trim() } : {}),
-          ...(input.symbol.trim() ? { symbol: input.symbol.trim() } : {}),
-          ...(input.color ? { color: input.color } : {})
-        }
+        next
       ]
     };
     emitDemo();

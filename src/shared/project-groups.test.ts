@@ -30,6 +30,7 @@ describe("project group presentation", () => {
         label: "Portal klienta",
         symbol: "PK",
         color: "#8d6bc5",
+        collapsed: true,
         order: 0
       },
       {
@@ -48,7 +49,8 @@ describe("project group presentation", () => {
     expect(groups[0]).toMatchObject({
       key: "customer-portal",
       symbol: "PK",
-      color: "#8d6bc5"
+      color: "#8d6bc5",
+      collapsed: true
     });
   });
 
@@ -60,6 +62,7 @@ describe("project group presentation", () => {
           label: "  Portal  ",
           symbol: "ABC",
           color: "#8D6BC5",
+          collapsed: true,
           order: 2.4
         },
         {
@@ -78,6 +81,7 @@ describe("project group presentation", () => {
         label: "Portal",
         symbol: "AB",
         color: "#8d6bc5",
+        collapsed: true,
         order: 2
       }
     ]);

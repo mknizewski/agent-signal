@@ -3951,3 +3951,203 @@ html[data-compact="true"] body {
 .preference-toggle small {
   font-size: 10.5px;
 }
+
+/* Colored and collapsible project headers. */
+.project-group__icon {
+  border-color: color-mix(in srgb, var(--project-color) 52%, var(--line));
+  color: var(--project-color);
+  background: color-mix(in srgb, var(--project-color) 17%, var(--surface));
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--project-color) 6%, transparent);
+  font-size: 11px;
+}
+
+[data-theme="dark"] .project-group__icon {
+  border-color: color-mix(in srgb, var(--project-color) 58%, #333330);
+  color: color-mix(in srgb, var(--project-color) 88%, white);
+  background: color-mix(in srgb, var(--project-color) 19%, var(--surface));
+}
+
+.project-group__collapse {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--subtle);
+  background: transparent;
+  cursor: pointer;
+}
+
+.project-group__collapse:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--project-color) 9%, transparent);
+}
+
+.project-group__collapse svg {
+  transition: transform 160ms ease;
+}
+
+.project-group__collapse svg.is-collapsed {
+  transform: rotate(-90deg);
+}
+
+.project-group.is-collapsed .project-group__header {
+  padding-bottom: 0;
+}
+
+/* Persistent desktop sidebar rail. */
+.sidebar-collapse {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 7px;
+  color: var(--subtle);
+  background: transparent;
+  cursor: pointer;
+}
+
+.sidebar-collapse:hover {
+  color: var(--text);
+  background: var(--sidebar-hover);
+}
+
+@media (min-width: 781px) {
+  .app-shell.is-sidebar-collapsed {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .sidebar--collapsed {
+    padding: 16px 8px 14px;
+  }
+
+  .sidebar--collapsed .brand {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .sidebar--collapsed .brand-mark,
+  .sidebar--collapsed .brand strong,
+  .sidebar--collapsed .sidebar-watched,
+  .sidebar--collapsed .connections,
+  .sidebar--collapsed .signal-legend {
+    display: none;
+  }
+
+  .sidebar--collapsed .sidebar-collapse {
+    margin-left: 0;
+  }
+
+  .sidebar--collapsed .nav-list {
+    align-items: center;
+  }
+
+  .sidebar--collapsed .nav-list button {
+    width: 40px;
+    grid-template-columns: 1fr;
+    justify-items: center;
+    padding: 0;
+  }
+
+  .sidebar--collapsed .nav-list button span,
+  .sidebar--collapsed .nav-list button em {
+    display: none;
+  }
+}
+
+@media (max-width: 780px) {
+  .sidebar-collapse {
+    display: none;
+  }
+}
+
+/* A restrained halo keeps active compact signals readable at a glance. */
+.traffic-light--working.is-active {
+  box-shadow:
+    inset 0 5px 12px rgba(125, 20, 25, 0.22),
+    0 0 0 3px rgba(237, 90, 95, 0.08),
+    0 0 27px 4px rgba(237, 90, 95, 0.26);
+}
+
+.traffic-light--attention.is-active {
+  box-shadow:
+    inset 0 5px 12px rgba(105, 67, 5, 0.2),
+    0 0 0 3px rgba(228, 166, 43, 0.08),
+    0 0 27px 4px rgba(228, 166, 43, 0.24);
+}
+
+.traffic-light--idle.is-active {
+  box-shadow:
+    inset 0 5px 12px rgba(8, 84, 48, 0.2),
+    0 0 0 3px rgba(61, 180, 122, 0.08),
+    0 0 27px 4px rgba(61, 180, 122, 0.24);
+}
+
+/* Mobile-device setup must remain readable without system zoom. */
+.mobile-devices-modal__header h2 {
+  font-size: 17px;
+}
+
+.mobile-devices-modal__header p {
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.mobile-gateway-card__state strong {
+  font-size: 13px;
+}
+
+.mobile-gateway-card__state span {
+  font-size: 10.5px;
+}
+
+.mobile-pair-button {
+  font-size: 11.5px;
+}
+
+.mobile-pairing__steps > span {
+  font-size: 10px;
+}
+
+.mobile-pairing__instructions p,
+.mobile-pairing__instructions ol {
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.mobile-pairing__instructions code {
+  font-size: 9.5px;
+}
+
+.mobile-pairing__timer,
+.mobile-device-error {
+  font-size: 10.5px;
+}
+
+.mobile-device-list__heading strong {
+  font-size: 11.5px;
+}
+
+.mobile-device-list__heading span {
+  font-size: 9.5px;
+}
+
+.mobile-device-list__heading button {
+  font-size: 10.5px;
+}
+
+.mobile-device-list__empty {
+  font-size: 10.5px;
+}
+
+.mobile-device-row strong {
+  font-size: 11.5px;
+}
+
+.mobile-device-row span {
+  font-size: 10px;
+}

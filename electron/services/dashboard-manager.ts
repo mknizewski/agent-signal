@@ -214,20 +214,29 @@ export class DashboardManager {
       -1
     );
     const next: ProjectGroupConfig = {
+      ...existing,
       projectKey: input.projectKey,
-      order: existing?.order ?? maxOrder + 1,
-      ...(input.label.trim()
-        ? { label: input.label.trim().slice(0, 80) }
-        : {}),
-      ...(input.symbol.trim()
-        ? {
-            symbol: [...input.symbol.trim()].slice(0, 2).join("")
-          }
-        : {}),
-      ...(input.color.trim()
-        ? { color: input.color.trim().toLowerCase() }
-        : {})
+      order: existing?.order ?? maxOrder + 1
     };
+    if (input.label !== undefined) {
+      const label = input.label.trim().slice(0, 80);
+      if (label) next.label = label;
+      else delete next.label;
+    }
+    if (input.symbol !== undefined) {
+      const symbol = [...input.symbol.trim()].slice(0, 2).join("");
+      if (symbol) next.symbol = symbol;
+      else delete next.symbol;
+    }
+    if (input.color !== undefined) {
+      const color = input.color.trim().toLowerCase();
+      if (color) next.color = color;
+      else delete next.color;
+    }
+    if (input.collapsed !== undefined) {
+      if (input.collapsed) next.collapsed = true;
+      else delete next.collapsed;
+    }
     this.projectGroups = normalizeProjectGroupConfigs([
       ...this.projectGroups.filter(
         (group) => group.projectKey !== input.projectKey

@@ -3,7 +3,13 @@ import {
   useState,
   type CSSProperties
 } from "react";
-import { GripVertical, Pencil, RotateCcw, X } from "lucide-react";
+import {
+  ChevronDown,
+  GripVertical,
+  Pencil,
+  RotateCcw,
+  X
+} from "lucide-react";
 import type {
   AppLanguage,
   UpdateProjectGroupInput
@@ -139,6 +145,24 @@ export function ProjectGroupHeader({
             <GripVertical size={15} />
           </span>
         )}
+        <button
+          className="project-group__collapse"
+          type="button"
+          title={group.collapsed ? copy.groups.expand : copy.groups.collapse}
+          aria-label={`${group.collapsed ? copy.groups.expand : copy.groups.collapse}: ${group.name}`}
+          aria-expanded={!group.collapsed}
+          onClick={() =>
+            void onUpdate({
+              projectKey: group.key,
+              collapsed: !group.collapsed
+            })
+          }
+        >
+          <ChevronDown
+            className={group.collapsed ? "is-collapsed" : ""}
+            size={15}
+          />
+        </button>
         <span className="project-group__icon">{group.symbol}</span>
         <strong>{group.name}</strong>
         <button

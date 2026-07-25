@@ -61,6 +61,8 @@ const translations = {
       watchedSection: "Obserwowane czaty",
       collapseWatched: "Zwiń obserwowane",
       expandWatched: "Rozwiń obserwowane",
+      collapseSidebar: "Zwiń menu boczne",
+      expandSidebar: "Rozwiń menu boczne",
       noWatched: "Brak obserwowanych czatów"
     },
     picker: {
@@ -88,6 +90,8 @@ const translations = {
     groups: {
       edit: "Edytuj grupę",
       drag: "Przeciągnij, aby zmienić kolejność",
+      collapse: "Zwiń grupę",
+      expand: "Rozwiń grupę",
       name: "Nazwa grupy",
       namePlaceholder: "Własna nazwa",
       symbol: "Litera",
@@ -139,6 +143,9 @@ const translations = {
       notifications: "Powiadomienia systemowe",
       notificationsDescription:
         "Informuje o oczekującym zatwierdzeniu i zakończonej pracy.",
+      approvalNotifications: "Alerty o oczekiwaniu na zatwierdzenie",
+      approvalNotificationsDescription:
+        "Wyłącz, aby wyciszyć krótkie alerty desktopowe i mobilne dla tego statusu.",
       petTitle: "Pupil i bezczynność",
       sleepingPet: "Pokazuj śpiącego pupila",
       sleepingPetDescription:
@@ -282,6 +289,8 @@ const translations = {
       watchedSection: "Watched chats",
       collapseWatched: "Collapse watched chats",
       expandWatched: "Expand watched chats",
+      collapseSidebar: "Collapse sidebar",
+      expandSidebar: "Expand sidebar",
       noWatched: "No watched chats"
     },
     picker: {
@@ -309,6 +318,8 @@ const translations = {
     groups: {
       edit: "Edit group",
       drag: "Drag to reorder",
+      collapse: "Collapse group",
+      expand: "Expand group",
       name: "Group name",
       namePlaceholder: "Custom name",
       symbol: "Letter",
@@ -360,6 +371,9 @@ const translations = {
       notifications: "System notifications",
       notificationsDescription:
         "Notifies you when a session needs approval or finishes working.",
+      approvalNotifications: "Approval-wait alerts",
+      approvalNotificationsDescription:
+        "Turn off brief desktop and mobile alerts for this status.",
       petTitle: "Pet and idle behavior",
       sleepingPet: "Show sleeping pets",
       sleepingPetDescription:

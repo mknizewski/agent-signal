@@ -9,10 +9,11 @@ export interface MobileNotificationPayload {
 export function mobileNotificationForTransition(
   before: SessionStatus | undefined,
   current: SessionStatus,
-  sessionTitle: string
+  sessionTitle: string,
+  approvalNotifications = true
 ): MobileNotificationPayload | undefined {
   if (!before || before === current) return undefined;
-  if (current === "attention") {
+  if (current === "attention" && approvalNotifications) {
     return {
       title: "Agent Signal · do zatwierdzenia",
       body: sessionTitle,

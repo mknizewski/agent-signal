@@ -65,6 +65,7 @@ export interface ProjectGroupConfig {
   label?: string;
   symbol?: string;
   color?: string;
+  collapsed?: boolean;
   order: number;
 }
 
@@ -81,6 +82,7 @@ export interface AppPreferences {
   detectNewSessions: boolean;
   promptForNewSessions: boolean;
   systemNotifications: boolean;
+  approvalNotifications: boolean;
 }
 
 export interface ProviderStatus {
@@ -116,9 +118,10 @@ export interface UpdateTrackedSessionInput {
 
 export interface UpdateProjectGroupInput {
   projectKey: string;
-  label: string;
-  symbol: string;
-  color: string;
+  label?: string;
+  symbol?: string;
+  color?: string;
+  collapsed?: boolean;
 }
 
 export interface ReorderProjectGroupsInput {

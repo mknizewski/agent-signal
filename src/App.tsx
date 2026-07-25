@@ -12,6 +12,8 @@ import {
   ChevronDown,
   Circle,
   Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   RefreshCw,
   Search,
@@ -108,6 +110,10 @@ export default function App() {
   const [compact, setCompact] = useState(
     () => window.localStorage.getItem("agent-signal-compact") === "true"
   );
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () =>
+      window.localStorage.getItem("agent-signal-sidebar-collapsed") === "true"
+  );
   const copy = copyFor(snapshot.preferences.language);
 
   useEffect(() => {
@@ -131,6 +137,13 @@ export default function App() {
     window.localStorage.setItem("agent-signal-compact", String(compact));
     void agentApi.setCompactMode(compact).catch(showError);
   }, [compact]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      "agent-signal-sidebar-collapsed",
+      String(sidebarCollapsed)
+    );
+  }, [sidebarCollapsed]);
 
   useEffect(() => {
     document.documentElement.lang = snapshot.preferences.language;
@@ -498,8 +511,16 @@ export default function App() {
         language={snapshot.preferences.language}
         onToggleCompact={() => setCompact(true)}
       />
-      <div className="app-shell">
-        <aside className="sidebar">
+      <div
+        className={`app-shell ${
+          sidebarCollapsed ? "is-sidebar-collapsed" : ""
+        }`}
+      >
+        <aside
+          className={`sidebar ${
+            sidebarCollapsed ? "sidebar--collapsed" : ""
+          }`}
+        >
           <div className="brand">
             <span className="brand-mark">
               <i />
@@ -507,6 +528,27 @@ export default function App() {
               <i />
             </span>
             <strong>Agent Signal</strong>
+            <button
+              className="sidebar-collapse"
+              type="button"
+              title={
+                sidebarCollapsed
+                  ? copy.app.expandSidebar
+                  : copy.app.collapseSidebar
+              }
+              aria-label={
+                sidebarCollapsed
+                  ? copy.app.expandSidebar
+                  : copy.app.collapseSidebar
+              }
+              onClick={() => setSidebarCollapsed((current) => !current)}
+            >
+              {sidebarCollapsed ? (
+                <PanelLeftOpen size={16} />
+              ) : (
+                <PanelLeftClose size={16} />
+              )}
+            </button>
           </div>
 
           <nav className="nav-list">
@@ -842,7 +884,9 @@ export default function App() {
                 <div className="project-groups">
                   {visibleGroups.map((group) => (
                     <section
-                      className="project-group"
+                      className={`project-group ${
+                        group.collapsed ? "is-collapsed" : ""
+                      }`}
                       key={group.key}
                     >
                       {snapshot.preferences.groupTrackedByProject && (
@@ -868,24 +912,26 @@ export default function App() {
                           }}
                         />
                       )}
-                      <div className="chat-list">
-                        <div className="chat-list__header">
-                          <span>{copy.app.chatColumn}</span>
-                          <span>{copy.app.statusColumn}</span>
-                          <span>{copy.app.activityColumn}</span>
+                      {!group.collapsed && (
+                        <div className="chat-list">
+                          <div className="chat-list__header">
+                            <span>{copy.app.chatColumn}</span>
+                            <span>{copy.app.statusColumn}</span>
+                            <span>{copy.app.activityColumn}</span>
+                          </div>
+                          {group.sessions.map((session) => (
+                            <TrackedChatRow
+                              key={session.id}
+                              session={session}
+                              now={now}
+                              preferences={snapshot.preferences}
+                              onArchive={archiveSession}
+                              onOpen={openSession}
+                              onTogglePin={togglePin}
+                            />
+                          ))}
                         </div>
-                        {group.sessions.map((session) => (
-                          <TrackedChatRow
-                            key={session.id}
-                            session={session}
-                            now={now}
-                            preferences={snapshot.preferences}
-                            onArchive={archiveSession}
-                            onOpen={openSession}
-                            onTogglePin={togglePin}
-                          />
-                        ))}
-                      </div>
+                      )}
                     </section>
                   ))}
                 </div>
@@ -980,6 +1026,8 @@ function NavButton({
     <button
       className={active ? "is-active" : ""}
       type="button"
+      title={label}
+      aria-label={label}
       onClick={onClick}
     >
       {icon ?? (
