@@ -5,10 +5,13 @@ import {
 } from "lucide-react";
 import type {
   AgentKind,
+  AppPreferences,
   SessionStatus,
   TrackedSession
 } from "../shared/types";
 import { formatRelativeTime, statusLabel } from "../shared/status";
+import { isSessionSleeping } from "../shared/preferences";
+import { copyFor } from "../lib/i18n";
 import { StatusPet } from "./StatusPet";
 
 type SignalCounts = Record<SessionStatus, number>;
@@ -19,6 +22,8 @@ interface CompactDashboardProps {
   theme: "light" | "dark";
   refreshing: boolean;
   updatedAt: string;
+  now: Date;
+  preferences: AppPreferences;
   onRefresh(): void;
   onThemeToggle(): void;
 }
@@ -35,10 +40,17 @@ export function CompactDashboard({
   theme,
   refreshing,
   updatedAt,
+  now,
+  preferences,
   onRefresh,
   onThemeToggle
 }: CompactDashboardProps) {
-  const headline = compactHeadline(counts, sessions.length);
+  const copy = copyFor(preferences.language);
+  const headline = compactHeadline(
+    counts,
+    sessions.length,
+    preferences.language
+  );
 
   return (
     <div className="compact-shell">
@@ -49,7 +61,7 @@ export function CompactDashboard({
             <i />
             <i />
           </span>
-          <strong>AgentSignal</strong>
+          <strong>Agent Signal</strong>
         </div>
         <div className="compact-header__actions">
           <button
@@ -57,13 +69,13 @@ export function CompactDashboard({
             type="button"
             title={
               theme === "dark"
-                ? "Włącz jasny motyw"
-                : "Włącz ciemny motyw"
+                ? copy.app.lightTheme
+                : copy.app.darkTheme
             }
             aria-label={
               theme === "dark"
-                ? "Włącz jasny motyw"
-                : "Włącz ciemny motyw"
+                ? copy.app.lightTheme
+                : copy.app.darkTheme
             }
             onClick={onThemeToggle}
           >
@@ -72,8 +84,8 @@ export function CompactDashboard({
           <button
             className="icon-button"
             type="button"
-            title="Odśwież sesje"
-            aria-label="Odśwież sesje"
+            title={copy.app.refresh}
+            aria-label={copy.app.refresh}
             onClick={onRefresh}
           >
             <RefreshCw
@@ -86,17 +98,19 @@ export function CompactDashboard({
 
       <main className="compact-dashboard">
         <div className="compact-title">
-          <p className="eyebrow">Tryb kompaktowy</p>
+          <p className="eyebrow">{copy.compact.eyebrow}</p>
           <h1>{headline}</h1>
           <span>
             {sessions.length}{" "}
-            {sessions.length === 1 ? "obserwowany czat" : "obserwowane czaty"}
+            {sessions.length === 1
+              ? copy.compact.trackedOne
+              : copy.compact.trackedMany}
           </span>
         </div>
 
         <section
           className="compact-traffic"
-          aria-label="Zagregowana sygnalizacja czatów"
+          aria-label={copy.compact.trafficLabel}
         >
           <div className="traffic-housing">
             {signalStatuses.map((status) => (
@@ -116,8 +130,16 @@ export function CompactDashboard({
               <div key={status}>
                 <i className={`summary-dot summary-dot--${status}`} />
                 <span>
-                  <strong>{statusLabel(status)}</strong>
-                  <small>{compactStatusText(status, counts[status])}</small>
+                    <strong>
+                      {statusLabel(status, preferences.language)}
+                    </strong>
+                    <small>
+                      {compactStatusText(
+                        status,
+                        counts[status],
+                        preferences.language
+                      )}
+                    </small>
                 </span>
               </div>
             ))}
@@ -130,7 +152,20 @@ export function CompactDashboard({
               (session) => session.agent === agent
             );
             const status = aggregateAgentStatus(agentSessions);
-            const summary = compactAgentSummary(agentSessions);
+            const summary = compactAgentSummary(
+              agentSessions,
+              preferences.language
+            );
+            const sleeping =
+              agentSessions.length > 0 &&
+              agentSessions.every((session) =>
+                isSessionSleeping(
+                  session.status,
+                  session.updatedAt,
+                  now,
+                  preferences
+                )
+              );
             return (
               <div
                 className={`compact-agent compact-agent--${status}`}
@@ -140,6 +175,8 @@ export function CompactDashboard({
                   agent={agent}
                   status={status}
                   size="large"
+                  sleeping={sleeping}
+                  language={preferences.language}
                 />
                 <span>
                   <strong>{agent === "codex" ? "Codex" : "Claude"}</strong>
@@ -152,23 +189,31 @@ export function CompactDashboard({
 
         {(counts.error > 0 || counts.unavailable > 0) && (
           <p className="compact-unknown">
-            {counts.error + counts.unavailable}{" "}
-            {counts.error + counts.unavailable === 1
-              ? "sesja bez potwierdzonego stanu"
-              : "sesje bez potwierdzonego stanu"}
+            {copy.compact.unknownSession(
+              counts.error + counts.unavailable
+            )}
           </p>
         )}
 
         <footer className="compact-footer">
-          Ostatnia synchronizacja {formatRelativeTime(updatedAt)}
+          {copy.compact.lastSync}{" "}
+          {formatRelativeTime(
+            updatedAt,
+            now,
+            preferences.language
+          )}
         </footer>
       </main>
     </div>
   );
 }
 
-export function compactAgentSummary(sessions: TrackedSession[]): string {
-  if (sessions.length === 0) return "Brak czatów";
+export function compactAgentSummary(
+  sessions: TrackedSession[],
+  language: AppPreferences["language"] = "pl"
+): string {
+  const copy = copyFor(language);
+  if (sessions.length === 0) return copy.compact.noChats;
 
   const counts = sessions.reduce<Record<SessionStatus, number>>(
     (result, session) => {
@@ -186,22 +231,20 @@ export function compactAgentSummary(sessions: TrackedSession[]): string {
   const parts: string[] = [];
   if (counts.attention > 0) {
     parts.push(
-      `${counts.attention} ${
-        counts.attention === 1 ? "wymaga uwagi" : "wymagają uwagi"
-      }`
+      copy.compact.requiresAttention(counts.attention)
     );
   }
   if (counts.working > 0) {
     parts.push(
-      `${counts.working} ${counts.working === 1 ? "pracuje" : "pracują"}`
+      copy.compact.isWorking(counts.working)
     );
   }
   if (counts.idle > 0) {
-    parts.push(`${counts.idle} ${counts.idle === 1 ? "wolny" : "wolne"}`);
+    parts.push(copy.compact.isIdle(counts.idle));
   }
   const unknownCount = counts.error + counts.unavailable;
   if (unknownCount > 0) {
-    parts.push(`${unknownCount} bez potwierdzonego stanu`);
+    parts.push(copy.compact.unknown(unknownCount));
   }
   return parts.join(" · ");
 }
@@ -225,21 +268,25 @@ function aggregateAgentStatus(
 
 function compactHeadline(
   counts: SignalCounts,
-  sessionCount: number
+  sessionCount: number,
+  language: AppPreferences["language"]
 ): string {
-  if (sessionCount === 0) return "Brak obserwowanych";
-  if (counts.attention > 0) return "Potrzebna uwaga";
-  if (counts.working > 0) return "Agenci pracują";
-  if (counts.idle === sessionCount) return "Wszystkie wolne";
-  return "Stan częściowo nieznany";
+  const copy = copyFor(language);
+  if (sessionCount === 0) return copy.compact.noTracked;
+  if (counts.attention > 0) return copy.compact.attention;
+  if (counts.working > 0) return copy.compact.working;
+  if (counts.idle === sessionCount) return copy.compact.allIdle;
+  return copy.compact.partial;
 }
 
 function compactStatusText(
   status: SessionStatus,
-  count: number
+  count: number,
+  language: AppPreferences["language"]
 ): string {
-  if (count === 0) return "Brak";
-  if (status === "working") return `${count} w trakcie pracy`;
-  if (status === "attention") return `${count} czeka na Ciebie`;
-  return `${count} bez aktywnej pracy`;
+  const copy = copyFor(language);
+  if (count === 0) return copy.compact.none;
+  if (status === "working") return copy.compact.inProgress(count);
+  if (status === "attention") return copy.compact.waiting(count);
+  return copy.compact.inactive(count);
 }

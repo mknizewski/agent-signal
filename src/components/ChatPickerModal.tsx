@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, Plus, Search, X } from "lucide-react";
 import type {
   AgentKind,
+  AppPreferences,
   DiscoveredSession,
   ProviderStatus
 } from "../shared/types";
 import { formatRelativeTime } from "../shared/status";
+import { copyFor } from "../lib/i18n";
 import { AgentMark } from "./AgentMark";
 
 type SourceFilter = "all" | AgentKind;
@@ -14,6 +16,7 @@ interface ChatPickerModalProps {
   open: boolean;
   sessions: DiscoveredSession[];
   providers: Record<AgentKind, ProviderStatus>;
+  preferences: AppPreferences;
   onClose(): void;
   onAdd(sessionIds: string[]): Promise<void>;
 }
@@ -22,9 +25,11 @@ export function ChatPickerModal({
   open,
   sessions,
   providers,
+  preferences,
   onClose,
   onAdd
 }: ChatPickerModalProps) {
+  const copy = copyFor(preferences.language);
   const [query, setQuery] = useState("");
   const [source, setSource] = useState<SourceFilter>("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -55,6 +60,19 @@ export function ChatPickerModal({
         .includes(normalized);
     });
   }, [query, sessions, source]);
+  const sessionGroups = useMemo(
+    () =>
+      groupSessions(
+        visibleSessions,
+        preferences.groupPickerByProject,
+        copy.common.noProject
+      ),
+    [
+      copy.common.noProject,
+      preferences.groupPickerByProject,
+      visibleSessions
+    ]
+  );
 
   if (!open) return null;
 
@@ -96,13 +114,13 @@ export function ChatPickerModal({
       >
         <header className="chat-picker__header">
           <div>
-            <h2 id="chat-picker-title">Dodaj czaty</h2>
-            <p>Wybierz istniejące sesje, które chcesz obserwować.</p>
+            <h2 id="chat-picker-title">{copy.picker.title}</h2>
+            <p>{copy.picker.subtitle}</p>
           </div>
           <button
             className="icon-button"
             type="button"
-            aria-label="Zamknij"
+            aria-label={copy.common.close}
             onClick={onClose}
           >
             <X size={18} />
@@ -116,7 +134,7 @@ export function ChatPickerModal({
               autoFocus
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Szukaj po tytule lub projekcie"
+              placeholder={copy.picker.search}
             />
           </label>
           <div className="source-tabs">
@@ -125,7 +143,7 @@ export function ChatPickerModal({
               type="button"
               onClick={() => setSource("all")}
             >
-              Wszystkie
+              {copy.picker.all}
             </button>
             <button
               className={source === "codex" ? "is-active" : ""}
@@ -133,7 +151,7 @@ export function ChatPickerModal({
               disabled={!providers.codex.available}
               onClick={() => setSource("codex")}
             >
-              Codex
+              {copy.common.codex}
             </button>
             <button
               className={source === "claude" ? "is-active" : ""}
@@ -141,43 +159,66 @@ export function ChatPickerModal({
               disabled={!providers.claude.available}
               onClick={() => setSource("claude")}
             >
-              Claude Code
+              {copy.common.claude}
             </button>
           </div>
         </div>
 
         <div className="session-picker-list">
           {visibleSessions.length > 0 ? (
-            visibleSessions.map((session) => {
-              const isSelected = selected.has(session.id);
-              return (
-                <button
-                  className={`session-option ${isSelected ? "is-selected" : ""}`}
-                  type="button"
-                  key={session.id}
-                  onClick={() => toggle(session.id)}
-                >
-                  <span className="session-option__check">
-                    {isSelected && <Check size={13} strokeWidth={2.4} />}
-                  </span>
-                  <AgentMark agent={session.agent} />
-                  <span className="session-option__content">
-                    <strong>{session.title}</strong>
-                    <small>
-                      {session.workingDirectory || session.summary}
-                    </small>
-                  </span>
-                  <time>{formatRelativeTime(session.updatedAt)}</time>
-                </button>
-              );
-            })
+            sessionGroups.map((group) => (
+              <section
+                className="session-project-group"
+                key={group.name}
+              >
+                {preferences.groupPickerByProject && (
+                  <header>
+                    <strong>{group.name}</strong>
+                    <span>{group.sessions.length}</span>
+                  </header>
+                )}
+                {group.sessions.map((session) => {
+                  const isSelected = selected.has(session.id);
+                  return (
+                    <button
+                      className={`session-option ${
+                        isSelected ? "is-selected" : ""
+                      }`}
+                      type="button"
+                      key={session.id}
+                      onClick={() => toggle(session.id)}
+                    >
+                      <span className="session-option__check">
+                        {isSelected && (
+                          <Check
+                            size={13}
+                            strokeWidth={2.4}
+                          />
+                        )}
+                      </span>
+                      <AgentMark agent={session.agent} />
+                      <span className="session-option__content">
+                        <strong>{session.title}</strong>
+                        <small>
+                          {session.workingDirectory || session.summary}
+                        </small>
+                      </span>
+                      <time>
+                        {formatRelativeTime(
+                          session.updatedAt,
+                          new Date(),
+                          preferences.language
+                        )}
+                      </time>
+                    </button>
+                  );
+                })}
+              </section>
+            ))
           ) : (
             <div className="picker-empty">
-              <p>Brak nowych czatów do dodania.</p>
-              <span>
-                Uruchom sesję w Codex lub Claude Code, a następnie odśwież
-                dashboard.
-              </span>
+              <p>{copy.picker.empty}</p>
+              <span>{copy.picker.emptyDescription}</span>
             </div>
           )}
         </div>
@@ -187,8 +228,8 @@ export function ChatPickerModal({
         <footer className="chat-picker__footer">
           <span>
             {selected.size === 0
-              ? `${sessions.length} dostępnych`
-              : `Wybrano: ${selected.size}`}
+              ? copy.picker.available(sessions.length)
+              : copy.picker.selected(selected.size)}
           </span>
           <div>
             <button
@@ -196,7 +237,7 @@ export function ChatPickerModal({
               type="button"
               onClick={onClose}
             >
-              Anuluj
+              {copy.common.cancel}
             </button>
             <button
               className="button button--primary"
@@ -205,11 +246,27 @@ export function ChatPickerModal({
               onClick={submit}
             >
               <Plus size={15} />
-              {busy ? "Dodawanie…" : "Dodaj wybrane"}
+              {busy ? copy.picker.adding : copy.picker.addSelected}
             </button>
           </div>
         </footer>
       </section>
     </div>
   );
+}
+
+function groupSessions(
+  sessions: DiscoveredSession[],
+  grouped: boolean,
+  noProjectLabel: string
+): Array<{ name: string; sessions: DiscoveredSession[] }> {
+  if (!grouped) return [{ name: "all", sessions }];
+  const groups = new Map<string, DiscoveredSession[]>();
+  for (const session of sessions) {
+    const name = session.projectName || noProjectLabel;
+    groups.set(name, [...(groups.get(name) ?? []), session]);
+  }
+  return [...groups.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, entries]) => ({ name, sessions: entries }));
 }

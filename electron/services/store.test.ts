@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { TrackedSessionRecord } from "../../src/shared/types";
 import { TrackingStore } from "./store";
+import { DEFAULT_PREFERENCES } from "../../src/shared/preferences";
 
 const temporaryDirectories: string[] = [];
 
@@ -14,6 +15,8 @@ const trackedSession: TrackedSessionRecord = {
   title: "Test session",
   summary: "",
   workingDirectory: "D:\\Git\\project",
+  projectName: "project",
+  pinned: false,
   createdAt: "2026-07-24T10:00:00.000Z",
   updatedAt: "2026-07-24T12:00:00.000Z",
   trackedAt: "2026-07-24T11:00:00.000Z",
@@ -41,11 +44,12 @@ describe("TrackingStore", () => {
 
     expect(state).toEqual({
       trackedSessions: [trackedSession],
-      archivedSessions: []
+      archivedSessions: [],
+      preferences: DEFAULT_PREFERENCES
     });
   });
 
-  it("persists active and archived sessions as version 3", async () => {
+  it("persists active, archived sessions, and preferences as version 4", async () => {
     const directory = await createTemporaryDirectory();
     const store = new TrackingStore(directory);
     const archived = {
@@ -55,7 +59,8 @@ describe("TrackingStore", () => {
 
     await store.save({
       trackedSessions: [],
-      archivedSessions: [archived]
+      archivedSessions: [archived],
+      preferences: { ...DEFAULT_PREFERENCES, language: "en" }
     });
 
     const stored = JSON.parse(
@@ -65,9 +70,10 @@ describe("TrackingStore", () => {
       )
     ) as unknown;
     expect(stored).toEqual({
-      version: 3,
+      version: 4,
       trackedSessions: [],
-      archivedSessions: [archived]
+      archivedSessions: [archived],
+      preferences: { ...DEFAULT_PREFERENCES, language: "en" }
     });
   });
 });

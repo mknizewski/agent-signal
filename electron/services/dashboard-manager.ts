@@ -1,11 +1,18 @@
 import type {
+  AppPreferences,
   AppSnapshot,
   ArchivedSessionRecord,
   DiscoveredSession,
   ProviderStatus,
   TrackSessionsInput,
-  TrackedSessionRecord
+  TrackedSessionRecord,
+  UpdateTrackedSessionInput
 } from "../../src/shared/types";
+import {
+  DEFAULT_PREFERENCES,
+  normalizePreferences,
+  projectNameFromPath
+} from "../../src/shared/preferences";
 import {
   createArchivedSessionRecord,
   createTrackingRecord,
@@ -21,6 +28,10 @@ export class DashboardManager {
   private records: TrackedSessionRecord[] = [];
   private archivedRecords: ArchivedSessionRecord[] = [];
   private catalog: DiscoveredSession[] = [];
+  private preferences: AppPreferences = DEFAULT_PREFERENCES;
+  private pendingSessionPrompts = new Set<string>();
+  private knownCatalogIds = new Set<string>();
+  private catalogInitialized = false;
   private providers = detectProviders();
   private externalSessionSync?: ExternalSessionSync;
   private saveQueue = Promise.resolve();
@@ -34,6 +45,7 @@ export class DashboardManager {
     const state = await this.store.load();
     this.records = state.trackedSessions;
     this.archivedRecords = state.archivedSessions;
+    this.preferences = normalizePreferences(state.preferences);
     this.providers = detectProviders();
     this.emit();
     this.startExternalSync();
@@ -41,7 +53,11 @@ export class DashboardManager {
 
   getSnapshot(): AppSnapshot {
     return {
-      trackedSessions: resolveTrackedSessions(this.records, this.catalog),
+      trackedSessions: resolveTrackedSessions(
+        this.records,
+        this.catalog,
+        this.preferences.autoGroupProjects
+      ),
       archivedSessions: this.archivedRecords,
       availableSessions: untrackedSessions(
         this.records,
@@ -52,6 +68,10 @@ export class DashboardManager {
         codex: publicProviderStatus(this.providers.codex),
         claude: publicProviderStatus(this.providers.claude)
       },
+      preferences: this.preferences,
+      pendingSessionPrompts: [...this.pendingSessionPrompts].filter((id) =>
+        this.catalog.some((session) => session.id === id)
+      ),
       updatedAt: new Date().toISOString()
     };
   }
@@ -79,6 +99,9 @@ export class DashboardManager {
     this.records.push(
       ...sessionsToTrack.map((session) => createTrackingRecord(session!, now))
     );
+    for (const sessionId of requestedIds) {
+      this.pendingSessionPrompts.delete(sessionId);
+    }
 
     this.persistAndEmit();
     void this.externalSessionSync?.refreshNow();
@@ -125,6 +148,70 @@ export class DashboardManager {
     return this.getSnapshot();
   }
 
+  updateTrackedSession(input: UpdateTrackedSessionInput): AppSnapshot {
+    const record = this.records.find((item) => item.id === input.sessionId);
+    if (!record) {
+      throw new Error("Ten czat nie jest już obserwowany.");
+    }
+
+    if (typeof input.pinned === "boolean") {
+      record.pinned = this.preferences.enablePinning
+        ? input.pinned
+        : false;
+    }
+    if (typeof input.projectName === "string") {
+      record.projectName = input.projectName.trim().slice(0, 80);
+    }
+    this.persistAndEmit();
+    return this.getSnapshot();
+  }
+
+  updatePreferences(patch: Partial<AppPreferences>): AppSnapshot {
+    this.preferences = normalizePreferences({
+      ...this.preferences,
+      ...patch
+    });
+    if (!this.preferences.enablePinning) {
+      this.records = this.records.map((record) => ({
+        ...record,
+        pinned: false
+      }));
+    }
+    if (this.preferences.autoGroupProjects) {
+      const catalogById = new Map(
+        this.catalog.map((session) => [session.id, session])
+      );
+      this.records = this.records.map((record) => ({
+        ...record,
+        projectName:
+          catalogById.get(record.id)?.projectName ||
+          projectNameFromPath(record.workingDirectory)
+      }));
+    }
+    if (
+      !this.preferences.detectNewSessions ||
+      !this.preferences.promptForNewSessions
+    ) {
+      this.pendingSessionPrompts.clear();
+    }
+    this.persistAndEmit();
+    return this.getSnapshot();
+  }
+
+  dismissSessionPrompt(sessionId: string): AppSnapshot {
+    this.pendingSessionPrompts.delete(sessionId);
+    this.emit();
+    return this.getSnapshot();
+  }
+
+  getTrackedSessionRecord(sessionId: string): TrackedSessionRecord {
+    const record = this.records.find((item) => item.id === sessionId);
+    if (!record) {
+      throw new Error("Ten czat nie jest już obserwowany.");
+    }
+    return { ...record };
+  }
+
   refresh(): AppSnapshot {
     this.providers = detectProviders();
     void this.externalSessionSync?.refreshNow();
@@ -148,6 +235,28 @@ export class DashboardManager {
             : []
         ),
       onSessions: (sessions) => {
+        const hiddenIds = new Set([
+          ...this.records.map((record) => record.id),
+          ...this.archivedRecords.map((record) => record.id)
+        ]);
+        if (
+          this.catalogInitialized &&
+          this.preferences.detectNewSessions &&
+          this.preferences.promptForNewSessions
+        ) {
+          for (const session of sessions) {
+            if (
+              !this.knownCatalogIds.has(session.id) &&
+              !hiddenIds.has(session.id)
+            ) {
+              this.pendingSessionPrompts.add(session.id);
+            }
+          }
+        }
+        this.knownCatalogIds = new Set(
+          sessions.map((session) => session.id)
+        );
+        this.catalogInitialized = true;
         this.catalog = sessions;
         this.emit();
       },
@@ -169,11 +278,12 @@ export class DashboardManager {
       .then(() =>
         this.store.save({
           trackedSessions: records,
-          archivedSessions: archivedRecords
+          archivedSessions: archivedRecords,
+          preferences: this.preferences
         })
       )
       .catch((error) => {
-        console.error("Could not save AgentSignal dashboard state", error);
+        console.error("Could not save Agent Signal dashboard state", error);
       });
     this.emit();
   }

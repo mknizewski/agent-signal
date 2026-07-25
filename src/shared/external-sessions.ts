@@ -1,4 +1,5 @@
 import type { DiscoveredSession, SessionStatus } from "./types";
+import { projectNameFromPath } from "./preferences";
 
 export interface CodexThreadStatus {
   type?: "notLoaded" | "idle" | "systemError" | "active" | string;
@@ -38,6 +39,7 @@ export function mapCodexThread(
   const updatedAt = toIso(thread.updatedAt, new Date(createdAt));
   const status = codexStatus(thread, updatedAt, now);
   const preview = cleanText(thread.preview) || "Sesja Codexa";
+  const workingDirectory = cleanText(thread.cwd);
 
   return {
     id: `codex:${thread.id}`,
@@ -45,7 +47,8 @@ export function mapCodexThread(
     source: "codex-app",
     title: cleanText(thread.name) || preview,
     summary: preview,
-    workingDirectory: cleanText(thread.cwd),
+    workingDirectory,
+    projectName: projectNameFromPath(workingDirectory),
     status,
     statusText: codexStatusText(status),
     createdAt,
@@ -71,6 +74,7 @@ export function mapClaudeSession(
     cleanText(session.summary) ||
     cleanText(session.firstPrompt) ||
     "Sesja Claude Code";
+  const workingDirectory = cleanText(session.cwd);
 
   return {
     id: `claude:${session.sessionId}`,
@@ -78,7 +82,8 @@ export function mapClaudeSession(
     source: "claude-code",
     title,
     summary: cleanText(session.firstPrompt) || title,
-    workingDirectory: cleanText(session.cwd),
+    workingDirectory,
+    projectName: projectNameFromPath(workingDirectory),
     status,
     statusText: recentlyActive
       ? "Aktywność wykryta w Claude Code"
@@ -120,7 +125,9 @@ function codexStatus(
 }
 
 function codexStatusText(status: SessionStatus): string {
-  if (status === "attention") return "Czeka na decyzję w aplikacji Codex";
+  if (status === "attention") {
+    return "Czeka na zatwierdzenie w aplikacji Codex";
+  }
   if (status === "working") return "Aktywność wykryta w Codex";
   if (status === "error") return "Sesja Codexa zgłosiła błąd";
   if (status === "idle") return "Sesja jest bezczynna";

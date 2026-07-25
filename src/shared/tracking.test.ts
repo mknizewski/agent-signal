@@ -15,6 +15,7 @@ const session: DiscoveredSession = {
   title: "Napraw logowanie",
   summary: "Znajdź przyczynę błędu",
   workingDirectory: "D:\\Git\\portal",
+  projectName: "portal",
   status: "working",
   statusText: "Aktywność wykryta w Codex",
   createdAt: "2026-07-24T10:00:00.000Z",

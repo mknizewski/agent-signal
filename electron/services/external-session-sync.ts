@@ -254,8 +254,8 @@ class CodexHistoryClient {
     await this.request("initialize", {
       clientInfo: {
         name: "agent_signal_sync",
-        title: "AgentSignal Sync",
-        version: "0.6.0"
+        title: "Agent Signal Sync",
+        version: "0.6.1"
       },
       capabilities: { experimentalApi: true }
     });
@@ -290,7 +290,7 @@ class CodexHistoryClient {
         id: message.id,
         error: {
           code: -32601,
-          message: `AgentSignal Sync nie obsługuje żądania ${message.method}.`
+          message: `Agent Signal Sync nie obsługuje żądania ${message.method}.`
         }
       });
     }

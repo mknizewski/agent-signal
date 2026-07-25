@@ -240,7 +240,7 @@ export function MobileApp() {
       <MobileStateScreen
         icon={<ShieldCheck size={34} />}
         title="Telefon nie jest sparowany"
-        description="Otwórz AgentSignal na komputerze, wybierz Urządzenia mobilne i zeskanuj nowy kod QR."
+        description="Otwórz Agent Signal na komputerze, wybierz Urządzenia mobilne i zeskanuj nowy kod QR."
       />
     );
   }
@@ -265,7 +265,7 @@ export function MobileApp() {
             <i />
           </span>
           <div>
-            <strong>AgentSignal</strong>
+            <strong>Agent Signal</strong>
             <span
               className={`mobile-connection mobile-connection--${connection}`}
             >

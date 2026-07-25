@@ -1,24 +1,34 @@
-import type { AgentKind, SessionStatus } from "../shared/types";
+import type {
+  AgentKind,
+  AppLanguage,
+  SessionStatus
+} from "../shared/types";
 import { statusLabel } from "../shared/status";
 
 interface StatusPetProps {
   agent: AgentKind;
   status: SessionStatus;
   size?: "small" | "large";
+  sleeping?: boolean;
+  language?: AppLanguage;
 }
 
 export function StatusPet({
   agent,
   status,
-  size = "small"
+  size = "small",
+  sleeping = false,
+  language = "pl"
 }: StatusPetProps) {
   const agentLabel = agent === "codex" ? "Codex" : "Claude";
 
   return (
     <span
-      className={`status-pet status-pet--${agent} status-pet--${status} status-pet--${size}`}
+      className={`status-pet status-pet--${agent} status-pet--${status} status-pet--${size} ${
+        sleeping ? "status-pet--sleeping" : ""
+      }`}
       role="img"
-      aria-label={`${agentLabel}: ${statusLabel(status)}`}
+      aria-label={`${agentLabel}: ${statusLabel(status, language)}`}
     >
       <span className="status-pet__body">
         {agent === "codex" && <i className="status-pet__antenna" />}
@@ -26,10 +36,20 @@ export function StatusPet({
         <i className="status-pet__eye status-pet__eye--right" />
         <i className="status-pet__mouth" />
       </span>
-      {status === "attention" && (
+      {sleeping && (
+        <span
+          className="status-pet__sleep"
+          aria-hidden="true"
+        >
+          <i>z</i>
+          <i>z</i>
+          <i>z</i>
+        </span>
+      )}
+      {!sleeping && status === "attention" && (
         <i className="status-pet__wave" aria-hidden="true" />
       )}
-      {status === "working" && (
+      {!sleeping && status === "working" && (
         <span className="status-pet__work" aria-hidden="true">
           <i className="status-pet__work-item status-pet__work-item--laptop">
             <i className="status-pet__laptop" />

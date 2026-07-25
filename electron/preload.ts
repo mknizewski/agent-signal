@@ -1,8 +1,10 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type {
   AgentSignalApi,
+  AppPreferences,
   AppSnapshot,
-  TrackSessionsInput
+  TrackSessionsInput,
+  UpdateTrackedSessionInput
 } from "../src/shared/types";
 
 const api: AgentSignalApi = {
@@ -15,6 +17,14 @@ const api: AgentSignalApi = {
     ipcRenderer.invoke("sessions:restore", sessionId),
   deleteArchivedSession: (sessionId: string) =>
     ipcRenderer.invoke("sessions:delete-archived", sessionId),
+  updateTrackedSession: (input: UpdateTrackedSessionInput) =>
+    ipcRenderer.invoke("sessions:update", input),
+  updatePreferences: (patch: Partial<AppPreferences>) =>
+    ipcRenderer.invoke("preferences:update", patch),
+  dismissSessionPrompt: (sessionId: string) =>
+    ipcRenderer.invoke("sessions:dismiss-prompt", sessionId),
+  openSession: (sessionId: string) =>
+    ipcRenderer.invoke("sessions:open", sessionId),
   refresh: () => ipcRenderer.invoke("sessions:refresh"),
   setCompactMode: (compact: boolean) =>
     ipcRenderer.invoke("window:compact", compact),

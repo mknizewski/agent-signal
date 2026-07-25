@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import path from "node:path";
 import {
   app,
@@ -7,18 +8,22 @@ import {
   Notification,
   safeStorage,
   session,
+  shell,
   Tray
 } from "electron";
 import type {
+  AppPreferences,
   AppSnapshot,
   MobileGatewayStatus,
   SessionStatus,
-  TrackSessionsInput
+  TrackSessionsInput,
+  UpdateTrackedSessionInput
 } from "../src/shared/types";
 import { DashboardManager } from "./services/dashboard-manager";
 import { MobileGateway } from "./services/mobile-gateway";
 import { MobileStore } from "./services/mobile-store";
 import { TrackingStore } from "./services/store";
+import { resolveClaudeExecutable } from "./services/detector";
 
 let mainWindow: BrowserWindow | null = null;
 let dashboardManager: DashboardManager | null = null;
@@ -27,11 +32,19 @@ let tray: Tray | null = null;
 let quitting = false;
 let notificationsReady = false;
 let normalWindowBounds: Electron.Rectangle | undefined;
+let trayLanguage: AppPreferences["language"] = "pl";
 const lastStatuses = new Map<string, SessionStatus>();
 const smokeMode = process.argv.includes("--smoke-test");
 
 const lock = app.requestSingleInstanceLock();
-if (!lock) app.quit();
+if (!lock) {
+  if (smokeMode) {
+    console.error("APP_SMOKE_FAILED: another Agent Signal instance is running.");
+    app.exit(2);
+  } else {
+    app.quit();
+  }
+}
 
 app.on("second-instance", () => {
   if (!mainWindow) return;
@@ -86,6 +99,12 @@ app.whenReady().then(async () => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+}).catch((error) => {
+  console.error("Agent Signal failed during startup", error);
+  if (smokeMode) {
+    quitting = true;
+    app.exit(1);
+  }
 });
 
 app.on("before-quit", (event) => {
@@ -117,7 +136,7 @@ function createWindow(): void {
       height: 38
     },
     show: false,
-    title: "AgentSignal",
+    title: "Agent Signal",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -140,9 +159,23 @@ function createWindow(): void {
   mainWindow.webContents.once("did-finish-load", () => {
     if (!smokeMode) return;
     setTimeout(() => {
-      quitting = true;
-      app.quit();
-    }, 250);
+      void verifyPackagedRenderer();
+    }, 700);
+  });
+
+  mainWindow.webContents.on(
+    "did-fail-load",
+    (_event, code, description, url, isMainFrame) => {
+      if (!smokeMode || !isMainFrame) return;
+      failAppSmoke(
+        `main frame failed to load (${code}: ${description}) at ${url}`
+      );
+    }
+  );
+
+  mainWindow.webContents.on("render-process-gone", (_event, details) => {
+    if (!smokeMode) return;
+    failAppSmoke(`renderer process exited: ${details.reason}`);
   });
 
   const developmentUrl = resolveDevelopmentUrl();
@@ -162,21 +195,27 @@ function createWindow(): void {
 
 function createTray(): void {
   tray = new Tray(path.join(app.getAppPath(), "build", "icon.ico"));
-  tray.setToolTip("AgentSignal");
+  tray.setToolTip("Agent Signal");
+  updateTrayMenu(trayLanguage);
+  tray.on("double-click", showMainWindow);
+}
+
+function updateTrayMenu(language: AppPreferences["language"]): void {
+  if (!tray) return;
+  trayLanguage = language;
   tray.setContextMenu(
     Menu.buildFromTemplate([
       {
-        label: "Otwórz AgentSignal",
+        label: language === "pl" ? "Otwórz Agent Signal" : "Open Agent Signal",
         click: showMainWindow
       },
       { type: "separator" },
       {
-        label: "Wyjście",
+        label: language === "pl" ? "Wyjście" : "Exit",
         click: () => app.quit()
       }
     ])
   );
-  tray.on("double-click", showMainWindow);
 }
 
 function showMainWindow(): void {
@@ -203,6 +242,20 @@ function registerIpc(): void {
   ipcMain.handle("sessions:delete-archived", (_event, sessionId: unknown) =>
     requireManager().deleteArchivedSession(parseSessionId(sessionId))
   );
+  ipcMain.handle("sessions:update", (_event, input: unknown) =>
+    requireManager().updateTrackedSession(
+      parseUpdateTrackedSessionInput(input)
+    )
+  );
+  ipcMain.handle("preferences:update", (_event, patch: unknown) =>
+    requireManager().updatePreferences(parsePreferencesPatch(patch))
+  );
+  ipcMain.handle("sessions:dismiss-prompt", (_event, sessionId: unknown) =>
+    requireManager().dismissSessionPrompt(parseSessionId(sessionId))
+  );
+  ipcMain.handle("sessions:open", async (_event, sessionId: unknown) => {
+    await openSessionInSource(parseSessionId(sessionId));
+  });
   ipcMain.handle("window:compact", (_event, compact: unknown) => {
     if (typeof compact !== "boolean") {
       throw new TypeError("Nieprawidłowa wartość trybu kompaktowego.");
@@ -262,18 +315,36 @@ function setCompactWindow(compact: boolean): void {
 function publishSnapshot(snapshot: AppSnapshot): void {
   mainWindow?.webContents.send("snapshot:changed", snapshot);
   mobileGateway?.publishSnapshot(snapshot);
+  if (trayLanguage !== snapshot.preferences.language) {
+    updateTrayMenu(snapshot.preferences.language);
+  }
 
   for (const session of snapshot.trackedSessions) {
     const previous = lastStatuses.get(session.id);
     lastStatuses.set(session.id, session.status);
-    if (!notificationsReady || !previous || previous === session.status) {
+    if (
+      !snapshot.preferences.systemNotifications ||
+      !notificationsReady ||
+      !previous ||
+      previous === session.status
+    ) {
       continue;
     }
 
     if (session.status === "attention") {
-      showNotification("AgentSignal · wymaga uwagi", session.title);
+      showNotification(
+        snapshot.preferences.language === "pl"
+          ? "Agent Signal · do zatwierdzenia"
+          : "Agent Signal · approval needed",
+        session.title
+      );
     } else if (session.status === "idle" && previous === "working") {
-      showNotification("AgentSignal · agent jest wolny", session.title);
+      showNotification(
+        snapshot.preferences.language === "pl"
+          ? "Agent Signal · agent jest wolny"
+          : "Agent Signal · agent is idle",
+        session.title
+      );
     }
   }
 }
@@ -293,7 +364,7 @@ function showNotification(title: string, body: string): void {
 }
 
 function requireManager(): DashboardManager {
-  if (!dashboardManager) throw new Error("AgentSignal jeszcze się uruchamia.");
+  if (!dashboardManager) throw new Error("Agent Signal jeszcze się uruchamia.");
   return dashboardManager;
 }
 
@@ -359,4 +430,168 @@ function parseDeviceId(value: unknown): string {
     throw new TypeError("Nieprawidłowy identyfikator urządzenia.");
   }
   return value;
+}
+
+async function verifyPackagedRenderer(): Promise<void> {
+  try {
+    const result = (await mainWindow?.webContents.executeJavaScript(`
+      (() => ({
+        title: document.title,
+        appShell: Boolean(document.querySelector(".app-shell")),
+        hasPreloadApi: Boolean(window.agentSignal),
+        language: document.documentElement.lang
+      }))()
+    `)) as
+      | {
+          title: string;
+          appShell: boolean;
+          hasPreloadApi: boolean;
+          language: string;
+        }
+      | undefined;
+    if (!result?.appShell) {
+      throw new Error("current Agent Signal dashboard was not rendered");
+    }
+    if (!result.hasPreloadApi) {
+      throw new Error("Electron preload API is unavailable");
+    }
+    console.log(`APP_SMOKE_OK ${JSON.stringify(result)}`);
+    quitting = true;
+    app.exit(0);
+  } catch (error) {
+    failAppSmoke(error instanceof Error ? error.message : String(error));
+  }
+}
+
+function failAppSmoke(message: string): void {
+  console.error(`APP_SMOKE_FAILED: ${message}`);
+  quitting = true;
+  app.exit(1);
+}
+
+async function openSessionInSource(sessionId: string): Promise<void> {
+  const record = requireManager().getTrackedSessionRecord(sessionId);
+  if (record.source === "codex-app" && record.threadId) {
+    await shell.openExternal(
+      `codex://threads/${encodeURIComponent(record.threadId)}`
+    );
+    return;
+  }
+
+  if (record.source === "claude-code" && record.sessionId) {
+    const executable = resolveClaudeExecutable();
+    if (!executable) {
+      throw new Error(
+        "Nie znaleziono Claude Code CLI potrzebnego do otwarcia sesji."
+      );
+    }
+    if (!/^[a-zA-Z0-9_-]{1,128}$/.test(record.sessionId)) {
+      throw new Error("Identyfikator sesji Claude Code jest nieprawidłowy.");
+    }
+    const child =
+      process.platform === "win32"
+        ? spawn(
+            "cmd.exe",
+            [
+              "/d",
+              "/s",
+              "/c",
+              "start",
+              "",
+              executable,
+              "--resume",
+              record.sessionId
+            ],
+            {
+              cwd: record.workingDirectory || undefined,
+              detached: true,
+              stdio: "ignore",
+              windowsHide: true
+            }
+          )
+        : spawn(executable, ["--resume", record.sessionId], {
+            cwd: record.workingDirectory || undefined,
+            detached: true,
+            stdio: "ignore"
+          });
+    child.unref();
+    return;
+  }
+
+  throw new Error("Ta sesja nie ma identyfikatora potrzebnego do otwarcia.");
+}
+
+function parseUpdateTrackedSessionInput(
+  input: unknown
+): UpdateTrackedSessionInput {
+  if (!input || typeof input !== "object") {
+    throw new TypeError("Nieprawidłowa aktualizacja czatu.");
+  }
+  const candidate = input as {
+    sessionId?: unknown;
+    pinned?: unknown;
+    projectName?: unknown;
+  };
+  const result: UpdateTrackedSessionInput = {
+    sessionId: parseSessionId(candidate.sessionId)
+  };
+  if (candidate.pinned !== undefined) {
+    if (typeof candidate.pinned !== "boolean") {
+      throw new TypeError("Nieprawidłowy stan przypięcia.");
+    }
+    result.pinned = candidate.pinned;
+  }
+  if (candidate.projectName !== undefined) {
+    if (
+      typeof candidate.projectName !== "string" ||
+      candidate.projectName.length > 80
+    ) {
+      throw new TypeError("Nieprawidłowa nazwa projektu.");
+    }
+    result.projectName = candidate.projectName;
+  }
+  return result;
+}
+
+function parsePreferencesPatch(input: unknown): Partial<AppPreferences> {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new TypeError("Nieprawidłowe preferencje.");
+  }
+  const candidate = input as Record<string, unknown>;
+  const result: Partial<AppPreferences> = {};
+  const booleanKeys = [
+    "groupTrackedByProject",
+    "autoGroupProjects",
+    "groupPickerByProject",
+    "openChatOnDoubleClick",
+    "enablePinning",
+    "watchedSidebarExpanded",
+    "idlePetAnimation",
+    "detectNewSessions",
+    "promptForNewSessions",
+    "systemNotifications"
+  ] as const;
+  for (const key of booleanKeys) {
+    if (candidate[key] === undefined) continue;
+    if (typeof candidate[key] !== "boolean") {
+      throw new TypeError(`Nieprawidłowa preferencja: ${key}.`);
+    }
+    result[key] = candidate[key];
+  }
+  if (candidate.language !== undefined) {
+    if (candidate.language !== "pl" && candidate.language !== "en") {
+      throw new TypeError("Nieprawidłowy język.");
+    }
+    result.language = candidate.language;
+  }
+  if (candidate.idleAfterMinutes !== undefined) {
+    if (
+      typeof candidate.idleAfterMinutes !== "number" ||
+      !Number.isFinite(candidate.idleAfterMinutes)
+    ) {
+      throw new TypeError("Nieprawidłowy czas bezczynności.");
+    }
+    result.idleAfterMinutes = candidate.idleAfterMinutes;
+  }
+  return result;
 }

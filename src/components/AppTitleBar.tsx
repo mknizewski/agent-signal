@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { agentApi } from "../lib/api";
+import { copyFor } from "../lib/i18n";
+import type { AppLanguage } from "../shared/types";
 
 interface AppTitleBarProps {
   compact: boolean;
+  language: AppLanguage;
   onToggleCompact(): void;
 }
 
@@ -10,8 +13,10 @@ type OpenMenu = "file" | "view" | null;
 
 export function AppTitleBar({
   compact,
+  language,
   onToggleCompact
 }: AppTitleBarProps) {
+  const copy = copyFor(language);
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
   const menuRoot = useRef<HTMLDivElement>(null);
 
@@ -44,7 +49,7 @@ export function AppTitleBar({
       >
         <span
           className="app-titlebar__icon"
-          aria-label="AgentSignal"
+          aria-label="Agent Signal"
         >
           <i />
           <i />
@@ -59,7 +64,7 @@ export function AppTitleBar({
             aria-expanded={openMenu === "file"}
             onClick={() => toggleMenu("file")}
           >
-            Plik
+            {copy.titlebar.file}
           </button>
           {openMenu === "file" && (
             <div
@@ -74,7 +79,7 @@ export function AppTitleBar({
                   void agentApi.exitApp();
                 }}
               >
-                <span>Wyjście</span>
+                <span>{copy.titlebar.exit}</span>
                 <kbd>Alt+F4</kbd>
               </button>
             </div>
@@ -89,7 +94,7 @@ export function AppTitleBar({
             aria-expanded={openMenu === "view"}
             onClick={() => toggleMenu("view")}
           >
-            Widok
+            {copy.titlebar.view}
           </button>
           {openMenu === "view" && (
             <div
@@ -105,7 +110,9 @@ export function AppTitleBar({
                 }}
               >
                 <span>
-                  {compact ? "Pełny widok" : "Tryb kompaktowy"}
+                  {compact
+                    ? copy.titlebar.fullView
+                    : copy.titlebar.compactView}
                 </span>
               </button>
             </div>

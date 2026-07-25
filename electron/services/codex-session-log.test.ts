@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   CodexSessionLogTracker,
+  inferCodexLogActivity,
   reduceCodexLogLines
 } from "./codex-session-log";
 
@@ -37,6 +38,16 @@ function toolOutput(callId: string): string {
       type: "function_call_output",
       call_id: callId,
       output: "redacted"
+    }
+  });
+}
+
+function reasoning(): string {
+  return JSON.stringify({
+    type: "response_item",
+    payload: {
+      type: "reasoning",
+      encrypted_content: "redacted"
     }
   });
 }
@@ -130,6 +141,21 @@ describe("Codex session log activity", () => {
       activity: "working",
       activeTurnId: "turn-1"
     });
+  });
+
+  it("recognizes a host-side approval pause after reasoning stops", () => {
+    const state = reduceCodexLogLines([
+      event("task_started", "turn-1"),
+      reasoning()
+    ]);
+
+    expect(state.approvalPendingLikely).toBe(true);
+    expect(
+      inferCodexLogActivity(state, 1_000, 9_001)
+    ).toBe("attention");
+    expect(
+      inferCodexLogActivity(state, 1_000, 8_999)
+    ).toBe("working");
   });
 
   it("clears outstanding attention calls when the turn ends", () => {

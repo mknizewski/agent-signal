@@ -4,8 +4,9 @@ import { formatRelativeTime, statusLabel } from "./status";
 describe("session status helpers", () => {
   it("uses the requested traffic-light wording", () => {
     expect(statusLabel("working")).toBe("Pracuje");
-    expect(statusLabel("attention")).toBe("Wymaga uwagi");
+    expect(statusLabel("attention")).toBe("Do zatwierdzenia");
     expect(statusLabel("idle")).toBe("Wolny");
+    expect(statusLabel("attention", "en")).toBe("Approval needed");
   });
 
   it("formats compact relative activity times", () => {

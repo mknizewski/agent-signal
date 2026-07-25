@@ -275,7 +275,7 @@ export class MobileGateway {
       void this.handleBootstrapRequest(request, response).catch((error) => {
         this.options.onDiagnostic?.("Błąd instalatora certyfikatu.", error);
         response.statusCode = 500;
-        response.end("AgentSignal certificate setup error");
+        response.end("Agent Signal certificate setup error");
       });
     });
 
@@ -351,11 +351,11 @@ export class MobileGateway {
       });
       response.end(`<!doctype html><meta charset="utf-8">
         <meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>AgentSignal — certyfikat</title>
+        <title>Agent Signal — certyfikat</title>
         <style>body{font:16px system-ui;max-width:36rem;margin:3rem auto;padding:0 1.25rem;line-height:1.55;color:#222}a{display:inline-block;padding:.8rem 1rem;border-radius:.6rem;background:#20201e;color:#fff;text-decoration:none}code{word-break:break-all;font-size:.78rem}</style>
-        <h1>AgentSignal na telefonie</h1>
+        <h1>Agent Signal na telefonie</h1>
         <p>Pobierz certyfikat, a następnie zainstaluj go w Androidzie jako certyfikat CA dla sieci VPN i aplikacji.</p>
-        <p><a href="/agent-signal-ca.crt">Pobierz certyfikat AgentSignal</a></p>
+        <p><a href="/agent-signal-ca.crt">Pobierz certyfikat Agent Signal</a></p>
         <p>Porównaj odcisk z aplikacją na komputerze:</p>
         <code>${escapeHtml(this.state.certificates?.fingerprint ?? "")}</code>`);
       return;

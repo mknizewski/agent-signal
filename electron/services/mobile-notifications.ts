@@ -14,14 +14,14 @@ export function mobileNotificationForTransition(
   if (!before || before === current) return undefined;
   if (current === "attention") {
     return {
-      title: "AgentSignal · wymaga uwagi",
+      title: "Agent Signal · do zatwierdzenia",
       body: sessionTitle,
       status: current
     };
   }
   if (before === "working" && current === "idle") {
     return {
-      title: "AgentSignal · agent jest wolny",
+      title: "Agent Signal · agent jest wolny",
       body: sessionTitle,
       status: current
     };

@@ -1,20 +1,21 @@
 {
   "name": "agent-signal",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Minimal desktop dashboard for tracking Codex and Claude Code sessions.",
   "main": "dist-electron/electron/main.js",
-  "author": "AgentSignal",
+  "author": "Agent Signal",
   "license": "MIT",
   "scripts": {
     "dev": "pnpm run build:main && concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .\"",
     "dev:web": "vite --host 127.0.0.1",
-    "build:main": "tsc -p tsconfig.node.json",
+    "build:main": "node scripts/clean-main-build.cjs && tsc -p tsconfig.node.json",
     "build:renderer": "vite build",
     "build": "pnpm run build:main && pnpm run build:renderer",
     "dist": "pnpm run build && electron-builder --win nsis",
     "test": "vitest run --exclude \"dist-electron/**\"",
     "test:sync-smoke": "pnpm run build:main && node scripts/smoke-external-sessions.cjs",
     "test:mobile-smoke": "pnpm run build && node scripts/smoke-mobile-gateway.cjs",
+    "test:app-smoke": "node scripts/smoke-packaged.cjs",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit"
   },
   "dependencies": {
@@ -45,7 +46,7 @@
   },
   "build": {
     "appId": "com.agentsignal.desktop",
-    "productName": "AgentSignal",
+    "productName": "Agent Signal",
     "asarUnpack": [
       "node_modules/@anthropic-ai/claude-agent-sdk*/**/*"
     ],

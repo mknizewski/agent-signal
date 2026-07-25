@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AppSnapshot } from "./types";
 import { createMobileSnapshot } from "./mobile";
+import { DEFAULT_PREFERENCES } from "./preferences";
 
 const snapshot: AppSnapshot = {
   trackedSessions: [
@@ -11,11 +12,13 @@ const snapshot: AppSnapshot = {
       title: "Bezpieczny tytuł",
       summary: "Poufne podsumowanie",
       workingDirectory: "C:\\tajny\\projekt",
+      projectName: "projekt",
       status: "attention",
       statusText: "Sesja czeka na decyzję",
       createdAt: "2026-07-25T10:00:00.000Z",
       updatedAt: "2026-07-25T10:01:00.000Z",
       trackedAt: "2026-07-25T10:00:30.000Z",
+      pinned: false,
       threadId: "secret-thread-id",
       available: true
     }
@@ -39,6 +42,8 @@ const snapshot: AppSnapshot = {
       detail: "brak"
     }
   },
+  preferences: DEFAULT_PREFERENCES,
+  pendingSessionPrompts: [],
   updatedAt: "2026-07-25T10:01:01.000Z"
 };
 

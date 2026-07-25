@@ -1,5 +1,6 @@
 import type {
   AgentSignalApi,
+  AppPreferences,
   AppSnapshot,
   ArchivedSessionRecord,
   DiscoveredSession,
@@ -7,6 +8,10 @@ import type {
   TrackSessionsInput,
   TrackedSession
 } from "../shared/types";
+import {
+  DEFAULT_PREFERENCES,
+  projectNameFromPath
+} from "../shared/preferences";
 
 const demoNow = Date.now();
 
@@ -76,9 +81,12 @@ let demoSnapshot: AppSnapshot = {
       detail: "Połączono z lokalnymi sesjami Claude Code"
     }
   },
+  preferences: DEFAULT_PREFERENCES,
+  pendingSessionPrompts: ["codex:demo-5"],
   trackedSessions: demoCatalog.slice(0, 3).map((item) => ({
     ...item,
     trackedAt: new Date(demoNow - 2 * 60 * 60_000).toISOString(),
+    pinned: item.id === "codex:demo-1",
     available: true
   })),
   archivedSessions: demoCatalog.slice(3, 4).map((item) => ({
@@ -117,11 +125,15 @@ const demoApi: AgentSignalApi = {
         ...selected.map((item) => ({
           ...item,
           trackedAt,
+          pinned: false,
           available: true
         }))
       ],
       availableSessions: demoSnapshot.availableSessions.filter(
         (item) => !selectedIds.has(item.id)
+      ),
+      pendingSessionPrompts: demoSnapshot.pendingSessionPrompts.filter(
+        (item) => !selectedIds.has(item)
       )
     };
     emitDemo();
@@ -181,6 +193,45 @@ const demoApi: AgentSignalApi = {
     emitDemo();
     return demoSnapshot;
   },
+  updateTrackedSession: async (input) => {
+    demoSnapshot = {
+      ...demoSnapshot,
+      trackedSessions: demoSnapshot.trackedSessions.map((item) =>
+        item.id === input.sessionId
+          ? {
+              ...item,
+              ...(input.pinned === undefined
+                ? {}
+                : { pinned: input.pinned }),
+              ...(input.projectName === undefined
+                ? {}
+                : { projectName: input.projectName })
+            }
+          : item
+      )
+    };
+    emitDemo();
+    return demoSnapshot;
+  },
+  updatePreferences: async (patch: Partial<AppPreferences>) => {
+    demoSnapshot = {
+      ...demoSnapshot,
+      preferences: { ...demoSnapshot.preferences, ...patch }
+    };
+    emitDemo();
+    return demoSnapshot;
+  },
+  dismissSessionPrompt: async (sessionId: string) => {
+    demoSnapshot = {
+      ...demoSnapshot,
+      pendingSessionPrompts: demoSnapshot.pendingSessionPrompts.filter(
+        (item) => item !== sessionId
+      )
+    };
+    emitDemo();
+    return demoSnapshot;
+  },
+  openSession: async () => undefined,
   refresh: async () => {
     emitDemo();
     return demoSnapshot;
@@ -244,6 +295,7 @@ function session(input: {
     title: input.title,
     summary: input.summary,
     workingDirectory: input.directory,
+    projectName: projectNameFromPath(input.directory),
     status: input.status,
     statusText:
       input.status === "working"
@@ -286,9 +338,15 @@ function restoreDemoSession(session: ArchivedSessionRecord): TrackedSession {
   const { archivedAt: _archivedAt, ...record } = session;
   const current = demoCatalog.find((item) => item.id === session.id);
   return current
-    ? { ...current, trackedAt: record.trackedAt, available: true }
+    ? {
+        ...current,
+        trackedAt: record.trackedAt,
+        pinned: record.pinned ?? false,
+        available: true
+      }
     : {
         ...record,
+        pinned: record.pinned ?? false,
         status: "unavailable",
         statusText: "Sesja nie jest obecnie widoczna",
         available: false
