@@ -1,11 +1,16 @@
 import { RotateCcw, Trash2 } from "lucide-react";
-import type { ArchivedSessionRecord } from "../shared/types";
+import type {
+  AppLanguage,
+  ArchivedSessionRecord
+} from "../shared/types";
 import { formatRelativeTime } from "../shared/status";
+import { copyFor } from "../lib/i18n";
 import { AgentMark } from "./AgentMark";
 
 interface ArchivedChatRowProps {
   session: ArchivedSessionRecord;
   now: Date;
+  language: AppLanguage;
   onRestore(sessionId: string): void;
   onDelete(sessionId: string): void;
 }
@@ -13,9 +18,11 @@ interface ArchivedChatRowProps {
 export function ArchivedChatRow({
   session,
   now,
+  language,
   onRestore,
   onDelete
 }: ArchivedChatRowProps) {
+  const copy = copyFor(language);
   return (
     <article className="chat-row archive-row">
       <AgentMark agent={session.agent} />
@@ -33,9 +40,9 @@ export function ArchivedChatRow({
       </div>
 
       <div className="archive-row__date">
-        <strong>Zarchiwizowano</strong>
+        <strong>{copy.row.archived}</strong>
         <time dateTime={session.archivedAt}>
-          {formatRelativeTime(session.archivedAt, now)}
+          {formatRelativeTime(session.archivedAt, now, language)}
         </time>
       </div>
 
@@ -43,8 +50,8 @@ export function ArchivedChatRow({
         <button
           className="row-action"
           type="button"
-          title="Przywróć do obserwowanych"
-          aria-label={`Przywróć do obserwowanych: ${session.title}`}
+          title={copy.row.restore}
+          aria-label={`${copy.row.restore}: ${session.title}`}
           onClick={() => onRestore(session.id)}
         >
           <RotateCcw size={15} />
@@ -52,8 +59,8 @@ export function ArchivedChatRow({
         <button
           className="row-action row-action--danger"
           type="button"
-          title="Usuń z archiwum"
-          aria-label={`Usuń z archiwum: ${session.title}`}
+          title={copy.row.delete}
+          aria-label={`${copy.row.delete}: ${session.title}`}
           onClick={() => onDelete(session.id)}
         >
           <Trash2 size={15} />

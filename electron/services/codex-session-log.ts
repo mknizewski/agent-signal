@@ -64,7 +64,9 @@ export class CodexSessionLogTracker {
         return initial.activity;
       }
 
-      if (fileStats.size === previous.offset) return previous.activity;
+      if (fileStats.size === previous.offset) {
+        return previous.activity;
+      }
 
       const length = fileStats.size - previous.offset;
       const data = Buffer.alloc(length);
@@ -121,7 +123,8 @@ export function reduceCodexLogLines(
       !line.includes('"function_call"') &&
       !line.includes('"function_call_output"') &&
       !line.includes('"custom_tool_call"') &&
-      !line.includes('"custom_tool_call_output"')
+      !line.includes('"custom_tool_call_output"') &&
+      !line.includes('"reasoning"')
     ) {
       continue;
     }

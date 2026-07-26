@@ -41,6 +41,16 @@ function toolOutput(callId: string): string {
   });
 }
 
+function reasoning(): string {
+  return JSON.stringify({
+    type: "response_item",
+    payload: {
+      type: "reasoning",
+      encrypted_content: "redacted"
+    }
+  });
+}
+
 describe("Codex session log activity", () => {
   it("marks an open Codex task as working", () => {
     const state = reduceCodexLogLines([event("task_started", "turn-1")]);
@@ -124,6 +134,18 @@ describe("Codex session log activity", () => {
         command: "redacted",
         timeout_ms: 120_000
       })
+    ]);
+
+    expect(state).toEqual({
+      activity: "working",
+      activeTurnId: "turn-1"
+    });
+  });
+
+  it("keeps a reasoning-only active turn working instead of guessing approval", () => {
+    const state = reduceCodexLogLines([
+      event("task_started", "turn-1"),
+      reasoning()
     ]);
 
     expect(state).toEqual({

@@ -57,7 +57,7 @@ self.addEventListener("fetch", (event) => {
 
 self.addEventListener("push", (event) => {
   let payload = {
-    title: "AgentSignal",
+    title: "Agent Signal",
     body: "Status sesji uległ zmianie.",
     status: "attention"
   };

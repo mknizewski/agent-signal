@@ -28,6 +28,10 @@ import {
 import { MobilePairingRegistry } from "./mobile-pairing";
 import { mobileNotificationForTransition } from "./mobile-notifications";
 import {
+  APPROVAL_NOTIFICATION_DELAY_MS,
+  NotificationDebouncer
+} from "./notification-debouncer";
+import {
   createEmptyMobileState,
   type MobileState,
   type StoredMobileDevice,
@@ -76,6 +80,9 @@ export class MobileGateway {
   private readonly pairingFailures = new Map<string, PairingFailureWindow>();
   private readonly eventClients = new Set<EventClient>();
   private previousStatuses?: Map<string, SessionStatus>;
+  private readonly approvalNotificationDebouncer = new NotificationDebouncer(
+    APPROVAL_NOTIFICATION_DELAY_MS
+  );
   private saveQueue = Promise.resolve();
   private heartbeat?: NodeJS.Timeout;
   private error?: string;
@@ -275,7 +282,7 @@ export class MobileGateway {
       void this.handleBootstrapRequest(request, response).catch((error) => {
         this.options.onDiagnostic?.("Błąd instalatora certyfikatu.", error);
         response.statusCode = 500;
-        response.end("AgentSignal certificate setup error");
+        response.end("Agent Signal certificate setup error");
       });
     });
 
@@ -303,6 +310,7 @@ export class MobileGateway {
   }
 
   private async stopServers(): Promise<void> {
+    this.approvalNotificationDebouncer.clear();
     if (this.heartbeat) clearInterval(this.heartbeat);
     this.heartbeat = undefined;
     this.pairingRegistry.clear();
@@ -351,11 +359,11 @@ export class MobileGateway {
       });
       response.end(`<!doctype html><meta charset="utf-8">
         <meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>AgentSignal — certyfikat</title>
+        <title>Agent Signal — certyfikat</title>
         <style>body{font:16px system-ui;max-width:36rem;margin:3rem auto;padding:0 1.25rem;line-height:1.55;color:#222}a{display:inline-block;padding:.8rem 1rem;border-radius:.6rem;background:#20201e;color:#fff;text-decoration:none}code{word-break:break-all;font-size:.78rem}</style>
-        <h1>AgentSignal na telefonie</h1>
+        <h1>Agent Signal na telefonie</h1>
         <p>Pobierz certyfikat, a następnie zainstaluj go w Androidzie jako certyfikat CA dla sieci VPN i aplikacji.</p>
-        <p><a href="/agent-signal-ca.crt">Pobierz certyfikat AgentSignal</a></p>
+        <p><a href="/agent-signal-ca.crt">Pobierz certyfikat Agent Signal</a></p>
         <p>Porównaj odcisk z aplikacją na komputerze:</p>
         <code>${escapeHtml(this.state.certificates?.fingerprint ?? "")}</code>`);
       return;
@@ -603,14 +611,53 @@ export class MobileGateway {
     this.previousStatuses = current;
     if (!previous || !this.state.enabled || !this.state.vapid) return;
 
+    const trackedSessionIds = new Set(
+      snapshot.trackedSessions.map((session) => session.id)
+    );
+    this.approvalNotificationDebouncer.cancelExcept(trackedSessionIds);
     for (const session of snapshot.trackedSessions) {
       const before = previous.get(session.id);
+      if (
+        session.status !== "attention" ||
+        !snapshot.preferences.approvalNotifications
+      ) {
+        this.approvalNotificationDebouncer.cancel(session.id);
+      }
       const payload = mobileNotificationForTransition(
         before,
         session.status,
-        session.title
+        session.title,
+        snapshot.preferences.approvalNotifications
       );
-      if (payload) await this.sendPushToDevices(payload);
+      if (!payload) continue;
+      if (payload.status !== "attention") {
+        await this.sendPushToDevices(payload);
+        continue;
+      }
+      this.approvalNotificationDebouncer.schedule(session.id, () => {
+        const currentSnapshot = this.latestSnapshot;
+        const currentSession = currentSnapshot?.trackedSessions.find(
+          (candidate) => candidate.id === session.id
+        );
+        if (
+          !currentSnapshot ||
+          currentSession?.status !== "attention" ||
+          !currentSnapshot.preferences.approvalNotifications ||
+          !this.state.enabled ||
+          !this.state.vapid
+        ) {
+          return;
+        }
+        void this.sendPushToDevices({
+          ...payload,
+          body: currentSession.title
+        }).catch((error) => {
+          this.options.onDiagnostic?.(
+            "Nie udało się wysłać opóźnionego powiadomienia.",
+            error
+          );
+        });
+      });
     }
   }
 

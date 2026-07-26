@@ -16,11 +16,13 @@ export function createTrackingRecord(
     title: session.title,
     summary: session.summary,
     workingDirectory: session.workingDirectory,
+    projectName: session.projectName,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
     trackedAt,
     threadId: session.threadId,
-    sessionId: session.sessionId
+    sessionId: session.sessionId,
+    pinned: false
   };
 }
 
@@ -30,7 +32,11 @@ export function createArchivedSessionRecord(
   archivedAt = new Date().toISOString()
 ): ArchivedSessionRecord {
   const latestRecord = currentSession
-    ? createTrackingRecord(currentSession, record.trackedAt)
+    ? {
+        ...createTrackingRecord(currentSession, record.trackedAt),
+        projectName: record.projectName || currentSession.projectName,
+        pinned: record.pinned ?? false
+      }
     : record;
   return { ...latestRecord, archivedAt };
 }
@@ -44,7 +50,8 @@ export function restoreTrackingRecord(
 
 export function resolveTrackedSessions(
   records: TrackedSessionRecord[],
-  catalog: DiscoveredSession[]
+  catalog: DiscoveredSession[],
+  autoGroupProjects = true
 ): TrackedSession[] {
   const catalogById = new Map(catalog.map((session) => [session.id, session]));
 
@@ -53,16 +60,24 @@ export function resolveTrackedSessions(
     if (current) {
       return {
         ...current,
+        projectName: autoGroupProjects
+          ? current.projectName
+          : record.projectName,
+        pinned: record.pinned ?? false,
         trackedAt: record.trackedAt,
-        available: true
+        available: true,
+        subagents: []
       };
     }
 
     return {
       ...record,
+      projectName: record.projectName,
+      pinned: record.pinned ?? false,
       status: "unavailable",
       statusText: "Sesja nie jest obecnie widoczna",
-      available: false
+      available: false,
+      subagents: []
     };
   });
 }

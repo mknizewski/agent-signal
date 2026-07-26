@@ -1,33 +1,62 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties
+} from "react";
 import {
   AlertCircle,
   Archive,
   Bot,
+  ChevronDown,
   Circle,
   Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   RefreshCw,
   Search,
+  Settings,
   SlidersHorizontal,
   Smartphone,
   Sun
 } from "lucide-react";
 import { agentApi, isDemoMode } from "./lib/api";
+import { copyFor, localizeRuntimeText } from "./lib/i18n";
+import { DEFAULT_PREFERENCES } from "./shared/preferences";
+import { groupSessionsByProject } from "./shared/project-groups";
 import type {
   AgentKind,
+  AppPreferences,
   AppSnapshot,
-  SessionStatus
+  SessionStatus,
+  TrackedSession,
+  UpdateProjectGroupInput
 } from "./shared/types";
-import { SIGNAL_ORDER, statusDescription, statusLabel } from "./shared/status";
+import {
+  SIGNAL_ORDER,
+  statusDescription,
+  statusLabel
+} from "./shared/status";
 import { AgentMark } from "./components/AgentMark";
 import { ArchivedChatRow } from "./components/ArchivedChatRow";
 import { AppTitleBar } from "./components/AppTitleBar";
 import { ChatPickerModal } from "./components/ChatPickerModal";
 import { CompactDashboard } from "./components/CompactDashboard";
 import { MobileDevicesModal } from "./components/MobileDevicesModal";
+import { NewSessionPrompt } from "./components/NewSessionPrompt";
+import { ProjectGroupHeader } from "./components/ProjectGroupHeader";
+import { SettingsView } from "./components/SettingsView";
 import { TrackedChatRow } from "./components/TrackedChatRow";
 
-type ViewFilter = "all" | "working" | "attention" | "idle" | "archive";
+type ViewFilter =
+  | "all"
+  | "working"
+  | "attention"
+  | "idle"
+  | "archive"
+  | "settings";
 type Theme = "light" | "dark";
 
 const emptySnapshot: AppSnapshot = {
@@ -50,6 +79,9 @@ const emptySnapshot: AppSnapshot = {
       detail: "Sprawdzanie…"
     }
   },
+  preferences: DEFAULT_PREFERENCES,
+  projectGroups: [],
+  pendingSessionPrompts: [],
   updatedAt: new Date().toISOString()
 };
 
@@ -62,6 +94,14 @@ export default function App() {
   const [now, setNow] = useState(new Date());
   const [toast, setToast] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [draggedProjectKey, setDraggedProjectKey] = useState<string | null>(
+    null
+  );
+  const [projectDropTargetKey, setProjectDropTargetKey] = useState<
+    string | null
+  >(null);
+  const draggedProjectKeyRef = useRef<string | null>(null);
+  const hoveredProjectKeyRef = useRef<string | null>(null);
   const [theme, setTheme] = useState<Theme>(() =>
     window.localStorage.getItem("agent-signal-theme") === "light"
       ? "light"
@@ -70,6 +110,11 @@ export default function App() {
   const [compact, setCompact] = useState(
     () => window.localStorage.getItem("agent-signal-compact") === "true"
   );
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () =>
+      window.localStorage.getItem("agent-signal-sidebar-collapsed") === "true"
+  );
+  const copy = copyFor(snapshot.preferences.language);
 
   useEffect(() => {
     void agentApi.getSnapshot().then(setSnapshot).catch(showError);
@@ -92,6 +137,17 @@ export default function App() {
     window.localStorage.setItem("agent-signal-compact", String(compact));
     void agentApi.setCompactMode(compact).catch(showError);
   }, [compact]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      "agent-signal-sidebar-collapsed",
+      String(sidebarCollapsed)
+    );
+  }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    document.documentElement.lang = snapshot.preferences.language;
+  }, [snapshot.preferences.language]);
 
   useEffect(() => {
     if (!toast) return;
@@ -118,6 +174,7 @@ export default function App() {
         if (
           filter !== "all" &&
           filter !== "archive" &&
+          filter !== "settings" &&
           session.status !== filter
         ) {
           return false;
@@ -127,6 +184,7 @@ export default function App() {
           session.title,
           session.summary,
           session.workingDirectory,
+          session.projectName,
           session.agent,
           session.statusText
         ]
@@ -134,16 +192,55 @@ export default function App() {
           .toLowerCase()
           .includes(normalizedQuery);
       })
-      .sort((left, right) => {
-        const statusDifference =
-          SIGNAL_ORDER.indexOf(left.status) - SIGNAL_ORDER.indexOf(right.status);
-        if (statusDifference !== 0) return statusDifference;
-        return (
-          new Date(right.updatedAt).getTime() -
-          new Date(left.updatedAt).getTime()
-        );
-      });
+      .sort(compareSessions);
   }, [filter, query, snapshot.trackedSessions]);
+
+  const visibleGroups = useMemo(
+    () =>
+      groupSessionsByProject(
+        visibleSessions,
+        snapshot.preferences.groupTrackedByProject,
+        copy.common.noProject,
+        snapshot.projectGroups
+      ),
+    [
+      copy.common.noProject,
+      snapshot.projectGroups,
+      snapshot.preferences.groupTrackedByProject,
+      visibleSessions
+    ]
+  );
+
+  const sidebarGroups = useMemo(
+    () =>
+      groupSessionsByProject(
+        [...snapshot.trackedSessions].sort(compareSessions),
+        snapshot.preferences.groupTrackedByProject,
+        copy.common.noProject,
+        snapshot.projectGroups
+      ),
+    [
+      copy.common.noProject,
+      snapshot.projectGroups,
+      snapshot.preferences.groupTrackedByProject,
+      snapshot.trackedSessions
+    ]
+  );
+
+  const allProjectGroups = useMemo(
+    () =>
+      groupSessionsByProject(
+        [...snapshot.trackedSessions].sort(compareSessions),
+        true,
+        copy.common.noProject,
+        snapshot.projectGroups
+      ),
+    [
+      copy.common.noProject,
+      snapshot.projectGroups,
+      snapshot.trackedSessions
+    ]
+  );
 
   const visibleArchivedSessions = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -154,6 +251,7 @@ export default function App() {
           session.title,
           session.summary,
           session.workingDirectory,
+          session.projectName,
           session.agent
         ]
           .join(" ")
@@ -167,8 +265,17 @@ export default function App() {
       );
   }, [query, snapshot.archivedSessions]);
 
+  const promptedSession = snapshot.pendingSessionPrompts
+    .map((id) =>
+      snapshot.availableSessions.find((session) => session.id === id)
+    )
+    .find((session): session is NonNullable<typeof session> =>
+      Boolean(session)
+    );
+
   function showError(error: unknown) {
-    setToast(error instanceof Error ? error.message : String(error));
+    const message = error instanceof Error ? error.message : String(error);
+    setToast(localizeRuntimeText(message, snapshot.preferences.language));
   }
 
   const refresh = async () => {
@@ -189,7 +296,7 @@ export default function App() {
   const archiveSession = async (sessionId: string) => {
     try {
       setSnapshot(await agentApi.archiveSession(sessionId));
-      setToast("Czat przeniesiono do archiwum.");
+      setToast(copy.app.archiveSuccess);
     } catch (error) {
       showError(error);
     }
@@ -198,7 +305,7 @@ export default function App() {
   const restoreSession = async (sessionId: string) => {
     try {
       setSnapshot(await agentApi.restoreArchivedSession(sessionId));
-      setToast("Czat przywrócono do obserwowanych.");
+      setToast(copy.app.restoreSuccess);
     } catch (error) {
       showError(error);
     }
@@ -210,17 +317,168 @@ export default function App() {
     );
     if (
       !window.confirm(
-        `Usunąć „${session?.title ?? "ten czat"}” z archiwum AgentSignal?\n\nOryginalna rozmowa w Codex lub Claude Code pozostanie bez zmian.`
+        copy.app.archiveDeleteConfirm(session?.title ?? copy.app.chatColumn)
       )
     ) {
       return;
     }
     try {
       setSnapshot(await agentApi.deleteArchivedSession(sessionId));
-      setToast("Wpis usunięto z archiwum.");
+      setToast(copy.app.deleteSuccess);
     } catch (error) {
       showError(error);
     }
+  };
+
+  const updatePreferences = async (patch: Partial<AppPreferences>) => {
+    try {
+      setSnapshot(await agentApi.updatePreferences(patch));
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const togglePin = async (sessionId: string, pinned: boolean) => {
+    try {
+      setSnapshot(
+        await agentApi.updateTrackedSession({ sessionId, pinned })
+      );
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const openSession = async (sessionId: string) => {
+    try {
+      await agentApi.openSession(sessionId);
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const openCodexThread = async (threadId: string) => {
+    try {
+      await agentApi.openCodexThread(threadId);
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const updateProjectGroup = async (input: UpdateProjectGroupInput) => {
+    try {
+      setSnapshot(await agentApi.updateProjectGroup(input));
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const startProjectDrag = (projectKey: string) => {
+    draggedProjectKeyRef.current = projectKey;
+    hoveredProjectKeyRef.current = projectKey;
+    setDraggedProjectKey(projectKey);
+    setProjectDropTargetKey(projectKey);
+  };
+
+  const reorderProjectBefore = async (
+    sourceProjectKey: string,
+    targetProjectKey: string
+  ) => {
+    const projectKeys = allProjectGroups.map((group) => group.key);
+    const withoutSource = projectKeys.filter(
+      (projectKey) => projectKey !== sourceProjectKey
+    );
+    const targetIndex = withoutSource.indexOf(targetProjectKey);
+    if (targetIndex < 0) return;
+    withoutSource.splice(targetIndex, 0, sourceProjectKey);
+    try {
+      setSnapshot(
+        await agentApi.reorderProjectGroups({
+          projectKeys: withoutSource
+        })
+      );
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const hoverProjectDrag = (projectKey: string) => {
+    const sourceProjectKey = draggedProjectKeyRef.current;
+    if (
+      !sourceProjectKey ||
+      hoveredProjectKeyRef.current === projectKey
+    ) {
+      return;
+    }
+    hoveredProjectKeyRef.current = projectKey;
+    setProjectDropTargetKey(projectKey);
+  };
+
+  const dropProject = (targetProjectKey: string) => {
+    const sourceProjectKey = draggedProjectKeyRef.current;
+    const hoveredProjectKey =
+      hoveredProjectKeyRef.current || targetProjectKey;
+    if (sourceProjectKey && hoveredProjectKey !== sourceProjectKey) {
+      void reorderProjectBefore(sourceProjectKey, hoveredProjectKey);
+    }
+    draggedProjectKeyRef.current = null;
+    hoveredProjectKeyRef.current = null;
+    setDraggedProjectKey(null);
+    setProjectDropTargetKey(null);
+  };
+
+  useEffect(() => {
+    const projectKeyAt = (clientX: number, clientY: number) =>
+      document
+        .elementFromPoint(clientX, clientY)
+        ?.closest<HTMLElement>("[data-project-key]")?.dataset.projectKey;
+
+    const handleMouseMove = (event: MouseEvent) => {
+      if (!draggedProjectKeyRef.current) return;
+      const projectKey = projectKeyAt(event.clientX, event.clientY);
+      if (projectKey) hoverProjectDrag(projectKey);
+    };
+
+    const handleMouseUp = (event: MouseEvent) => {
+      if (!draggedProjectKeyRef.current) return;
+      const projectKey =
+        projectKeyAt(event.clientX, event.clientY) ||
+        hoveredProjectKeyRef.current ||
+        draggedProjectKeyRef.current;
+      dropProject(projectKey);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  });
+
+  const observePromptedSession = async (sessionId: string) => {
+    try {
+      setSnapshot(await agentApi.trackSessions({ sessionIds: [sessionId] }));
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const dismissPrompt = async (sessionId: string) => {
+    try {
+      setSnapshot(await agentApi.dismissSessionPrompt(sessionId));
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const focusSession = (sessionId: string) => {
+    setFilter("all");
+    window.requestAnimationFrame(() => {
+      document.getElementById(`session-${sessionId}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+      });
+    });
   };
 
   const toggleTheme = () => {
@@ -230,317 +488,492 @@ export default function App() {
   if (compact) {
     return (
       <div className="app-frame">
-        <AppTitleBar
-          compact
-          onToggleCompact={() => setCompact(false)}
-        />
         <CompactDashboard
           counts={counts}
           sessions={snapshot.trackedSessions}
           theme={theme}
           refreshing={refreshing}
           updatedAt={snapshot.updatedAt}
+          now={now}
+          preferences={snapshot.preferences}
           onRefresh={refresh}
           onThemeToggle={toggleTheme}
+          onExpand={() => setCompact(false)}
         />
-        {toast && (
-          <div
-            className="toast"
-            role="alert"
-          >
-            <AlertCircle size={17} />
-            {toast}
-          </div>
-        )}
+        {toast && <Toast message={toast} />}
       </div>
     );
   }
 
+  const settingsView = filter === "settings";
+  const archiveView = filter === "archive";
+
   return (
     <div className="app-frame">
       <AppTitleBar
-        compact={false}
+        language={snapshot.preferences.language}
         onToggleCompact={() => setCompact(true)}
       />
-      <div className="app-shell">
-        <aside className="sidebar">
-        <div className="brand">
-          <span className="brand-mark">
-            <i />
-            <i />
-            <i />
-          </span>
-          <strong>AgentSignal</strong>
-        </div>
+      <div
+        className={`app-shell ${
+          sidebarCollapsed ? "is-sidebar-collapsed" : ""
+        }`}
+      >
+        <aside
+          className={`sidebar ${
+            sidebarCollapsed ? "sidebar--collapsed" : ""
+          }`}
+        >
+          <div className="brand">
+            <span className="brand-mark">
+              <i />
+              <i />
+              <i />
+            </span>
+            <strong>Agent Signal</strong>
+            <button
+              className="sidebar-collapse"
+              type="button"
+              title={
+                sidebarCollapsed
+                  ? copy.app.expandSidebar
+                  : copy.app.collapseSidebar
+              }
+              aria-label={
+                sidebarCollapsed
+                  ? copy.app.expandSidebar
+                  : copy.app.collapseSidebar
+              }
+              onClick={() => setSidebarCollapsed((current) => !current)}
+            >
+              {sidebarCollapsed ? (
+                <PanelLeftOpen size={16} />
+              ) : (
+                <PanelLeftClose size={16} />
+              )}
+            </button>
+          </div>
 
-        <nav className="nav-list">
-          <NavButton
-            active={filter === "all"}
-            count={snapshot.trackedSessions.length}
-            icon={<Bot size={16} />}
-            label="Obserwowane"
-            onClick={() => setFilter("all")}
-          />
-          <NavButton
-            active={filter === "working"}
-            count={counts.working}
-            dot="working"
-            label="Pracujące"
-            onClick={() => setFilter("working")}
-          />
-          <NavButton
-            active={filter === "attention"}
-            count={counts.attention}
-            dot="attention"
-            label="Wymagają uwagi"
-            onClick={() => setFilter("attention")}
-          />
-          <NavButton
-            active={filter === "idle"}
-            count={counts.idle}
-            dot="idle"
-            label="Wolne"
-            onClick={() => setFilter("idle")}
-          />
-          <NavButton
-            active={filter === "archive"}
-            count={snapshot.archivedSessions.length}
-            icon={<Archive size={16} />}
-            label="Archiwum"
-            onClick={() => setFilter("archive")}
-          />
-        </nav>
+          <nav className="nav-list">
+            <NavButton
+              active={filter === "all"}
+              count={snapshot.trackedSessions.length}
+              icon={<Bot size={16} />}
+              label={copy.app.watched}
+              onClick={() => setFilter("all")}
+            />
+            <NavButton
+              active={filter === "working"}
+              count={counts.working}
+              dot="working"
+              label={copy.app.working}
+              onClick={() => setFilter("working")}
+            />
+            <NavButton
+              active={filter === "attention"}
+              count={counts.attention}
+              dot="attention"
+              label={copy.app.attention}
+              onClick={() => setFilter("attention")}
+            />
+            <NavButton
+              active={filter === "idle"}
+              count={counts.idle}
+              dot="idle"
+              label={copy.app.idle}
+              onClick={() => setFilter("idle")}
+            />
+            <NavButton
+              active={filter === "archive"}
+              count={snapshot.archivedSessions.length}
+              icon={<Archive size={16} />}
+              label={copy.app.archive}
+              onClick={() => setFilter("archive")}
+            />
+            <NavButton
+              active={filter === "settings"}
+              count={0}
+              hideCount
+              icon={<Settings size={16} />}
+              label={copy.app.settings}
+              onClick={() => setFilter("settings")}
+            />
+          </nav>
 
-        <div className="sidebar__spacer" />
+          <section className="sidebar-watched">
+            <button
+              className="sidebar-watched__toggle"
+              type="button"
+              title={
+                snapshot.preferences.watchedSidebarExpanded
+                  ? copy.app.collapseWatched
+                  : copy.app.expandWatched
+              }
+              onClick={() =>
+                void updatePreferences({
+                  watchedSidebarExpanded:
+                    !snapshot.preferences.watchedSidebarExpanded
+                })
+              }
+            >
+              <span>{copy.app.watchedSection}</span>
+              <ChevronDown
+                className={
+                  snapshot.preferences.watchedSidebarExpanded
+                    ? "is-expanded"
+                    : ""
+                }
+                size={14}
+              />
+            </button>
+            {snapshot.preferences.watchedSidebarExpanded && (
+              <div className="sidebar-watched__content">
+                {snapshot.trackedSessions.length === 0 ? (
+                  <span className="sidebar-watched__empty">
+                    {copy.app.noWatched}
+                  </span>
+                ) : (
+                  sidebarGroups.map((group) => (
+                    <div
+                      className="sidebar-watched__group"
+                      key={group.key}
+                    >
+                      {snapshot.preferences.groupTrackedByProject && (
+                        <small>
+                          <i
+                            style={
+                              {
+                                "--project-color": group.color
+                              } as CSSProperties
+                            }
+                          >
+                            {group.symbol}
+                          </i>
+                          <span>{group.name}</span>
+                        </small>
+                      )}
+                      {group.sessions.map((session) => (
+                        <button
+                          type="button"
+                          key={session.id}
+                          title={session.title}
+                          onClick={() => focusSession(session.id)}
+                        >
+                          <i
+                            className={`legend-dot legend-dot--${session.status}`}
+                          />
+                          <span>{session.title}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </section>
 
-        <section className="connections">
-          <span className="sidebar-label">Źródła</span>
-          {(["codex", "claude"] as AgentKind[]).map((agent) => {
-            const provider = snapshot.providers[agent];
-            return (
-              <div
-                className="connection"
-                key={agent}
-                title={provider.detail}
-              >
-                <AgentMark agent={agent} />
-                <div>
-                  <strong>{provider.label}</strong>
-                  <span
-                    className={`connection__state ${
-                      provider.available
-                        ? "connection__state--online"
-                        : "connection__state--offline"
-                    }`}
-                  >
-                    {provider.available ? "Połączono" : "Niedostępny"}
+          <div className="sidebar__spacer" />
+
+          <section className="connections">
+            <span className="sidebar-label">{copy.app.sources}</span>
+            {(["codex", "claude"] as AgentKind[]).map((agent) => {
+              const provider = snapshot.providers[agent];
+              return (
+                <div
+                  className="connection"
+                  key={agent}
+                  title={localizeRuntimeText(
+                    provider.detail,
+                    snapshot.preferences.language
+                  )}
+                >
+                  <AgentMark agent={agent} />
+                  <div>
+                    <strong>{provider.label}</strong>
+                    <span
+                      className={`connection__state ${
+                        provider.available
+                          ? "connection__state--online"
+                          : "connection__state--offline"
+                      }`}
+                    >
+                      {provider.available
+                        ? copy.app.connected
+                        : copy.app.unavailable}
+                    </span>
+                  </div>
+                  <i className={provider.available ? "is-online" : ""} />
+                </div>
+              );
+            })}
+          </section>
+
+          <div className="signal-legend">
+            <span className="sidebar-label">{copy.app.signals}</span>
+            {(["working", "attention", "idle"] as SessionStatus[]).map(
+              (status) => (
+                <div key={status}>
+                  <i className={`legend-dot legend-dot--${status}`} />
+                  <span>
+                    <strong>
+                      {statusLabel(status, snapshot.preferences.language)}
+                    </strong>
+                    <small>
+                      {statusDescription(
+                        status,
+                        snapshot.preferences.language
+                      )}
+                    </small>
                   </span>
                 </div>
-                <i className={provider.available ? "is-online" : ""} />
-              </div>
-            );
-          })}
-        </section>
-
-        <div className="signal-legend">
-          <span className="sidebar-label">Sygnalizacja</span>
-          {(["working", "attention", "idle"] as SessionStatus[]).map(
-            (status) => (
-              <div key={status}>
-                <i className={`legend-dot legend-dot--${status}`} />
-                <span>
-                  <strong>{statusLabel(status)}</strong>
-                  <small>{statusDescription(status)}</small>
-                </span>
-              </div>
-            )
-          )}
-        </div>
+              )
+            )}
+          </div>
         </aside>
 
         <main className="workspace">
-        <header className="page-header">
-          <div>
-            <p className="eyebrow">
-              {filter === "archive" ? "Historia dashboardu" : "Dashboard agentów"}
-            </p>
-            <h1>{filter === "archive" ? "Archiwum" : "Obserwowane czaty"}</h1>
-            <span>
-              {filter === "archive"
-                ? "Zakończone obserwowanie sesji"
-                : "Sesje Codex i Claude Code"}
-            </span>
-          </div>
-          <div className="page-header__actions">
-            <button
-              className="icon-button icon-button--bordered"
-              type="button"
-              title="Urządzenia mobilne"
-              aria-label="Urządzenia mobilne"
-              onClick={() => setMobileDevicesOpen(true)}
-            >
-              <Smartphone size={17} />
-            </button>
-            <button
-              className="icon-button icon-button--bordered"
-              type="button"
-              title={
-                theme === "dark"
-                  ? "Włącz jasny motyw"
-                  : "Włącz ciemny motyw"
-              }
-              aria-label={
-                theme === "dark"
-                  ? "Włącz jasny motyw"
-                  : "Włącz ciemny motyw"
-              }
-              onClick={toggleTheme}
-            >
-              {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
-            </button>
-            <button
-              className="icon-button icon-button--bordered"
-              type="button"
-              title="Odśwież sesje"
-              aria-label="Odśwież sesje"
-              onClick={refresh}
-            >
-              <RefreshCw
-                className={refreshing ? "is-spinning" : ""}
-                size={17}
-              />
-            </button>
-            {filter !== "archive" && (
-              <button
-                className="button button--primary"
-                type="button"
-                onClick={() => setPickerOpen(true)}
-              >
-                <Plus size={16} />
-                Dodaj czat
-              </button>
-            )}
-          </div>
-        </header>
-
-        {filter !== "archive" && (
-          <section className="status-summary">
-            <SummaryItem status="working" count={counts.working} />
-            <SummaryItem status="attention" count={counts.attention} />
-            <SummaryItem status="idle" count={counts.idle} />
-          </section>
-        )}
-
-        <div
-          className={`list-toolbar ${
-            filter === "archive" ? "list-toolbar--archive" : ""
-          }`}
-        >
-          <label className="search-input search-input--page">
-            <Search size={16} />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={
-                filter === "archive"
-                  ? "Szukaj w archiwum"
-                  : "Szukaj obserwowanych czatów"
-              }
-            />
-          </label>
-          <span>
-            {filter === "archive"
-              ? `${visibleArchivedSessions.length} ${
-                  visibleArchivedSessions.length === 1 ? "wpis" : "wpisów"
-                }`
-              : `${visibleSessions.length} ${
-                  visibleSessions.length === 1 ? "czat" : "czatów"
-                }`}
-          </span>
-        </div>
-
-        <section className="chat-list">
-          {filter === "archive" ? (
-            visibleArchivedSessions.length > 0 ? (
-              <>
-                <div className="chat-list__header archive-list__header">
-                  <span>Czat</span>
-                  <span>Zarchiwizowano</span>
-                  <span>Akcje</span>
-                </div>
-                {visibleArchivedSessions.map((session) => (
-                  <ArchivedChatRow
-                    key={session.id}
-                    session={session}
-                    now={now}
-                    onRestore={restoreSession}
-                    onDelete={deleteArchivedSession}
-                  />
-                ))}
-              </>
-            ) : (
-              <div className="empty-state">
-                <span className="empty-state__icon">
-                  <Archive size={22} />
-                </span>
-                <h2>
-                  {snapshot.archivedSessions.length === 0
-                    ? "Archiwum jest puste"
-                    : "Brak wpisów pasujących do wyszukiwania"}
-                </h2>
-                <p>
-                  {snapshot.archivedSessions.length === 0
-                    ? "Archiwizuj zakończone czaty z widoku obserwowanych. Dopiero tutaj możesz usunąć wpis z AgentSignal."
-                    : "Zmień wyszukiwaną frazę."}
-                </p>
-              </div>
-            )
-          ) : visibleSessions.length > 0 ? (
-            <>
-              <div className="chat-list__header">
-                <span>Czat</span>
-                <span>Status</span>
-                <span>Aktywność</span>
-              </div>
-              {visibleSessions.map((session) => (
-                <TrackedChatRow
-                  key={session.id}
-                  session={session}
-                  now={now}
-                  onArchive={archiveSession}
-                />
-              ))}
-            </>
-          ) : (
-            <div className="empty-state">
-              <span className="empty-state__icon">
-                <SlidersHorizontal size={22} />
-              </span>
-              <h2>
-                {snapshot.trackedSessions.length === 0
-                  ? "Nie obserwujesz jeszcze żadnego czatu"
-                  : "Brak czatów w tym widoku"}
-              </h2>
-              <p>
-                {snapshot.trackedSessions.length === 0
-                  ? "Dodaj istniejącą sesję z Codex lub Claude Code. AgentSignal nie tworzy nowych rozmów — tylko pokazuje ich stan."
-                  : "Zmień filtr lub wyszukiwaną frazę."}
+          <header className="page-header">
+            <div>
+              <p className="eyebrow">
+                {settingsView
+                  ? copy.app.settingsEyebrow
+                  : archiveView
+                    ? copy.app.archiveEyebrow
+                    : copy.app.dashboardEyebrow}
               </p>
-              {snapshot.trackedSessions.length === 0 && (
+              <h1>
+                {settingsView
+                  ? copy.app.settingsTitle
+                  : archiveView
+                    ? copy.app.archiveTitle
+                    : copy.app.watchedTitle}
+              </h1>
+              <span>
+                {settingsView
+                  ? copy.app.settingsSubtitle
+                  : archiveView
+                    ? copy.app.archiveSubtitle
+                    : copy.app.watchedSubtitle}
+              </span>
+            </div>
+            <div className="page-header__actions">
+              <button
+                className="icon-button icon-button--bordered"
+                type="button"
+                title={copy.app.mobileDevices}
+                aria-label={copy.app.mobileDevices}
+                onClick={() => setMobileDevicesOpen(true)}
+              >
+                <Smartphone size={17} />
+              </button>
+              <button
+                className="icon-button icon-button--bordered"
+                type="button"
+                title={
+                  theme === "dark"
+                    ? copy.app.lightTheme
+                    : copy.app.darkTheme
+                }
+                aria-label={
+                  theme === "dark"
+                    ? copy.app.lightTheme
+                    : copy.app.darkTheme
+                }
+                onClick={toggleTheme}
+              >
+                {theme === "dark" ? (
+                  <Sun size={17} />
+                ) : (
+                  <Moon size={17} />
+                )}
+              </button>
+              {!settingsView && (
                 <button
-                  className="button button--secondary"
+                  className="icon-button icon-button--bordered"
+                  type="button"
+                  title={copy.app.refresh}
+                  aria-label={copy.app.refresh}
+                  onClick={refresh}
+                >
+                  <RefreshCw
+                    className={refreshing ? "is-spinning" : ""}
+                    size={17}
+                  />
+                </button>
+              )}
+              {!archiveView && !settingsView && (
+                <button
+                  className="button button--primary"
                   type="button"
                   onClick={() => setPickerOpen(true)}
                 >
-                  <Plus size={15} />
-                  Wybierz czaty
+                  <Plus size={16} />
+                  {copy.app.addChat}
                 </button>
               )}
             </div>
-          )}
-        </section>
+          </header>
 
-        {isDemoMode && <span className="demo-badge">Tryb podglądu UI</span>}
+          {settingsView ? (
+            <SettingsView
+              preferences={snapshot.preferences}
+              onUpdate={(patch) => void updatePreferences(patch)}
+            />
+          ) : (
+            <>
+              {!archiveView && (
+                <section className="status-summary">
+                  <SummaryItem
+                    status="working"
+                    count={counts.working}
+                    preferences={snapshot.preferences}
+                  />
+                  <SummaryItem
+                    status="attention"
+                    count={counts.attention}
+                    preferences={snapshot.preferences}
+                  />
+                  <SummaryItem
+                    status="idle"
+                    count={counts.idle}
+                    preferences={snapshot.preferences}
+                  />
+                </section>
+              )}
+
+              <div
+                className={`list-toolbar ${
+                  archiveView ? "list-toolbar--archive" : ""
+                }`}
+              >
+                <label className="search-input search-input--page">
+                  <Search size={16} />
+                  <input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder={
+                      archiveView
+                        ? copy.app.searchArchive
+                        : copy.app.searchWatched
+                    }
+                  />
+                </label>
+                <span>
+                  {archiveView
+                    ? countLabel(
+                        visibleArchivedSessions.length,
+                        "archive",
+                        snapshot.preferences.language
+                      )
+                    : countLabel(
+                        visibleSessions.length,
+                        "chat",
+                        snapshot.preferences.language
+                      )}
+                </span>
+              </div>
+
+              {archiveView ? (
+                <ArchiveList
+                  sessions={visibleArchivedSessions}
+                  hasAny={snapshot.archivedSessions.length > 0}
+                  now={now}
+                  language={snapshot.preferences.language}
+                  copy={copy}
+                  onRestore={restoreSession}
+                  onDelete={deleteArchivedSession}
+                />
+              ) : visibleSessions.length > 0 ? (
+                <div className="project-groups">
+                  {visibleGroups.map((group) => (
+                    <section
+                      className={`project-group ${
+                        group.collapsed ? "is-collapsed" : ""
+                      }`}
+                      key={group.key}
+                    >
+                      {snapshot.preferences.groupTrackedByProject && (
+                        <ProjectGroupHeader
+                          group={group}
+                          count={group.sessions.length}
+                          language={snapshot.preferences.language}
+                          draggable={allProjectGroups.length > 1}
+                          dragging={draggedProjectKey === group.key}
+                          dropTarget={
+                            draggedProjectKey !== null &&
+                            projectDropTargetKey === group.key
+                          }
+                          onUpdate={updateProjectGroup}
+                          onPointerStart={startProjectDrag}
+                          onPointerHover={hoverProjectDrag}
+                          onPointerDrop={dropProject}
+                          onPointerCancel={() => {
+                            draggedProjectKeyRef.current = null;
+                            hoveredProjectKeyRef.current = null;
+                            setDraggedProjectKey(null);
+                            setProjectDropTargetKey(null);
+                          }}
+                        />
+                      )}
+                      {!group.collapsed && (
+                        <div className="chat-list">
+                          <div className="chat-list__header">
+                            <span>{copy.app.chatColumn}</span>
+                            <span>{copy.app.statusColumn}</span>
+                            <span>{copy.app.activityColumn}</span>
+                          </div>
+                          {group.sessions.map((session) => (
+                            <TrackedChatRow
+                              key={session.id}
+                              session={session}
+                              now={now}
+                              preferences={snapshot.preferences}
+                              onArchive={archiveSession}
+                              onOpen={openSession}
+                              onOpenSubagent={openCodexThread}
+                              onTogglePin={togglePin}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </section>
+                  ))}
+                </div>
+              ) : (
+                <div className="chat-list">
+                  <div className="empty-state">
+                    <span className="empty-state__icon">
+                      <SlidersHorizontal size={22} />
+                    </span>
+                    <h2>
+                      {snapshot.trackedSessions.length === 0
+                        ? copy.app.watchedEmpty
+                        : copy.app.watchedNoMatches}
+                    </h2>
+                    <p>
+                      {snapshot.trackedSessions.length === 0
+                        ? copy.app.watchedEmptyDescription
+                        : copy.app.changeFilter}
+                    </p>
+                    {snapshot.trackedSessions.length === 0 && (
+                      <button
+                        className="button button--secondary"
+                        type="button"
+                        onClick={() => setPickerOpen(true)}
+                      >
+                        <Plus size={15} />
+                        {copy.app.chooseChats}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {isDemoMode && (
+            <span className="demo-badge">{copy.app.previewMode}</span>
+          )}
         </main>
       </div>
 
@@ -548,24 +981,28 @@ export default function App() {
         open={pickerOpen}
         sessions={snapshot.availableSessions}
         providers={snapshot.providers}
+        preferences={snapshot.preferences}
+        projectGroups={snapshot.projectGroups}
         onClose={() => setPickerOpen(false)}
         onAdd={addSessions}
       />
 
       <MobileDevicesModal
         open={mobileDevicesOpen}
+        language={snapshot.preferences.language}
         onClose={() => setMobileDevicesOpen(false)}
       />
 
-      {toast && (
-        <div
-          className="toast"
-          role="alert"
-        >
-          <AlertCircle size={17} />
-          {toast}
-        </div>
+      {promptedSession && (
+        <NewSessionPrompt
+          session={promptedSession}
+          language={snapshot.preferences.language}
+          onObserve={observePromptedSession}
+          onDismiss={dismissPrompt}
+        />
       )}
+
+      {toast && <Toast message={toast} />}
     </div>
   );
 }
@@ -576,6 +1013,7 @@ interface NavButtonProps {
   label: string;
   icon?: React.ReactNode;
   dot?: SessionStatus;
+  hideCount?: boolean;
   onClick(): void;
 }
 
@@ -585,12 +1023,15 @@ function NavButton({
   label,
   icon,
   dot,
+  hideCount = false,
   onClick
 }: NavButtonProps) {
   return (
     <button
       className={active ? "is-active" : ""}
       type="button"
+      title={label}
+      aria-label={label}
       onClick={onClick}
     >
       {icon ?? (
@@ -602,25 +1043,128 @@ function NavButton({
         />
       )}
       <span>{label}</span>
-      <em>{count}</em>
+      {!hideCount && <em>{count}</em>}
     </button>
   );
 }
 
 function SummaryItem({
   status,
-  count
+  count,
+  preferences
 }: {
   status: SessionStatus;
   count: number;
+  preferences: AppPreferences;
 }) {
   return (
     <div>
       <i className={`summary-dot summary-dot--${status}`} />
       <span>
         <strong>{count}</strong>
-        <small>{statusLabel(status)}</small>
+        <small>{statusLabel(status, preferences.language)}</small>
       </span>
     </div>
   );
+}
+
+function ArchiveList({
+  sessions,
+  hasAny,
+  now,
+  language,
+  copy,
+  onRestore,
+  onDelete
+}: {
+  sessions: AppSnapshot["archivedSessions"];
+  hasAny: boolean;
+  now: Date;
+  language: AppPreferences["language"];
+  copy: ReturnType<typeof copyFor>;
+  onRestore(sessionId: string): void;
+  onDelete(sessionId: string): void;
+}) {
+  return (
+    <section className="chat-list">
+      {sessions.length > 0 ? (
+        <>
+          <div className="chat-list__header archive-list__header">
+            <span>{copy.app.chatColumn}</span>
+            <span>{copy.app.archivedColumn}</span>
+            <span>{copy.app.actionsColumn}</span>
+          </div>
+          {sessions.map((session) => (
+            <ArchivedChatRow
+              key={session.id}
+              session={session}
+              now={now}
+              language={language}
+              onRestore={onRestore}
+              onDelete={onDelete}
+            />
+          ))}
+        </>
+      ) : (
+        <div className="empty-state">
+          <span className="empty-state__icon">
+            <Archive size={22} />
+          </span>
+          <h2>
+            {hasAny ? copy.app.archiveNoMatches : copy.app.archiveEmpty}
+          </h2>
+          <p>
+            {hasAny
+              ? copy.app.changeSearch
+              : copy.app.archiveEmptyDescription}
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function Toast({ message }: { message: string }) {
+  return (
+    <div
+      className="toast"
+      role="alert"
+    >
+      <AlertCircle size={17} />
+      {message}
+    </div>
+  );
+}
+
+function compareSessions(left: TrackedSession, right: TrackedSession): number {
+  const pinDifference =
+    Number(Boolean(right.pinned)) - Number(Boolean(left.pinned));
+  if (pinDifference !== 0) return pinDifference;
+  const statusDifference =
+    SIGNAL_ORDER.indexOf(left.status) - SIGNAL_ORDER.indexOf(right.status);
+  if (statusDifference !== 0) return statusDifference;
+  return (
+    new Date(right.updatedAt).getTime() -
+    new Date(left.updatedAt).getTime()
+  );
+}
+
+function countLabel(
+  count: number,
+  kind: "chat" | "archive",
+  language: AppPreferences["language"]
+): string {
+  if (language === "en") {
+    return `${count} ${
+      kind === "chat"
+        ? count === 1
+          ? "chat"
+          : "chats"
+        : count === 1
+          ? "entry"
+          : "entries"
+    }`;
+  }
+  if (kind === "chat") return `${count} ${count === 1 ? "czat" : "czatów"}`;
+  return `${count} ${count === 1 ? "wpis" : "wpisów"}`;
 }
