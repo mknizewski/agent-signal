@@ -9,14 +9,12 @@ describe("StatusPet motion variants", () => {
         agent="codex"
         status="working"
         size="large"
-        manager
         motion="compact"
       />
     );
 
     expect(markup).toContain("status-pet--compact-motion");
     expect(markup).not.toContain("status-pet__work");
-    expect(markup).not.toContain("status-pet__manager-clipboard");
     expect(markup).not.toContain("status-pet__wave");
   });
 
@@ -31,5 +29,22 @@ describe("StatusPet motion variants", () => {
     expect(markup).not.toContain("status-pet--compact-motion");
     expect(markup).toContain("status-pet__work");
     expect(markup).toContain("status-pet__hammer");
+  });
+
+  it("uses a neutral animation for statusless subagent presence", () => {
+    const markup = renderToStaticMarkup(
+      <StatusPet
+        agent="codex"
+        status="idle"
+        size="mini"
+        presenceOnly
+        ariaLabel="Wykryty subagent"
+      />
+    );
+
+    expect(markup).toContain("status-pet--presence");
+    expect(markup).toContain('aria-label="Wykryty subagent"');
+    expect(markup).not.toContain("status-pet__work");
+    expect(markup).not.toContain("status-pet__wave");
   });
 });

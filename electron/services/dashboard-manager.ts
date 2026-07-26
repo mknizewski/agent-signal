@@ -6,6 +6,7 @@ import type {
   ProviderStatus,
   ProjectGroupConfig,
   ReorderProjectGroupsInput,
+  SetProjectGroupsCollapsedInput,
   SessionSubagent,
   TrackSessionsInput,
   TrackedSessionRecord,
@@ -17,7 +18,10 @@ import {
   normalizePreferences,
   projectNameFromPath
 } from "../../src/shared/preferences";
-import { normalizeProjectGroupConfigs } from "../../src/shared/project-groups";
+import {
+  normalizeProjectGroupConfigs,
+  setProjectGroupsCollapsed
+} from "../../src/shared/project-groups";
 import {
   createArchivedSessionRecord,
   createTrackingRecord,
@@ -132,15 +136,24 @@ export class DashboardManager {
   }
 
   async archiveSession(sessionId: string): Promise<AppSnapshot> {
-    const record = this.records.find((item) => item.id === sessionId);
-    if (!record) {
-      throw new Error("Ten czat nie jest już obserwowany.");
+    return this.archiveSessions({ sessionIds: [sessionId] });
+  }
+
+  async archiveSessions(input: TrackSessionsInput): Promise<AppSnapshot> {
+    const requestedIds = [...new Set(input.sessionIds)];
+    const requestedSet = new Set(requestedIds);
+    const records = this.records.filter((item) => requestedSet.has(item.id));
+    if (records.length !== requestedIds.length) {
+      throw new Error("Co najmniej jeden czat nie jest już obserwowany.");
     }
-    const currentSession = this.catalog.find((item) => item.id === sessionId);
-    this.records = this.records.filter((item) => item.id !== sessionId);
-    this.archivedRecords.unshift(
-      createArchivedSessionRecord(record, currentSession)
-    );
+    const catalogById = new Map(this.catalog.map((item) => [item.id, item]));
+    this.records = this.records.filter((item) => !requestedSet.has(item.id));
+    this.archivedRecords = [
+      ...records.map((record) =>
+        createArchivedSessionRecord(record, catalogById.get(record.id))
+      ),
+      ...this.archivedRecords
+    ];
     this.persistAndEmit();
     return this.getSnapshot();
   }
@@ -160,13 +173,23 @@ export class DashboardManager {
   }
 
   async deleteArchivedSession(sessionId: string): Promise<AppSnapshot> {
-    const previousLength = this.archivedRecords.length;
-    this.archivedRecords = this.archivedRecords.filter(
-      (item) => item.id !== sessionId
+    return this.deleteArchivedSessions({ sessionIds: [sessionId] });
+  }
+
+  async deleteArchivedSessions(
+    input: TrackSessionsInput
+  ): Promise<AppSnapshot> {
+    const requestedIds = [...new Set(input.sessionIds)];
+    const requestedSet = new Set(requestedIds);
+    const records = this.archivedRecords.filter((item) =>
+      requestedSet.has(item.id)
     );
-    if (this.archivedRecords.length === previousLength) {
-      throw new Error("Ten czat nie znajduje się już w archiwum.");
+    if (records.length !== requestedIds.length) {
+      throw new Error("Co najmniej jeden czat nie znajduje się już w archiwum.");
     }
+    this.archivedRecords = this.archivedRecords.filter(
+      (item) => !requestedSet.has(item.id)
+    );
     this.persistAndEmit();
     return this.getSnapshot();
   }
@@ -253,6 +276,10 @@ export class DashboardManager {
       if (input.collapsed) next.collapsed = true;
       else delete next.collapsed;
     }
+    if (input.sidebarCollapsed !== undefined) {
+      if (input.sidebarCollapsed) next.sidebarCollapsed = true;
+      else delete next.sidebarCollapsed;
+    }
     this.projectGroups = normalizeProjectGroupConfigs([
       ...this.projectGroups.filter(
         (group) => group.projectKey !== input.projectKey
@@ -284,6 +311,18 @@ export class DashboardManager {
       ...reordered,
       ...remaining
     ]);
+    this.persistAndEmit();
+    return this.getSnapshot();
+  }
+
+  setProjectGroupsCollapsed(
+    input: SetProjectGroupsCollapsedInput
+  ): AppSnapshot {
+    this.projectGroups = setProjectGroupsCollapsed(
+      this.projectGroups,
+      input.projectKeys,
+      input.collapsed
+    );
     this.persistAndEmit();
     return this.getSnapshot();
   }

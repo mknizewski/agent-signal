@@ -16,6 +16,7 @@ import type {
   AppSnapshot,
   MobileGatewayStatus,
   ReorderProjectGroupsInput,
+  SetProjectGroupsCollapsedInput,
   SessionStatus,
   TrackSessionsInput,
   UpdateProjectGroupInput,
@@ -248,11 +249,19 @@ function registerIpc(): void {
   ipcMain.handle("sessions:archive", (_event, sessionId: unknown) =>
     requireManager().archiveSession(parseSessionId(sessionId))
   );
+  ipcMain.handle("sessions:archive-many", (_event, input: unknown) =>
+    requireManager().archiveSessions(parseTrackSessionsInput(input))
+  );
   ipcMain.handle("sessions:restore", (_event, sessionId: unknown) =>
     requireManager().restoreArchivedSession(parseSessionId(sessionId))
   );
   ipcMain.handle("sessions:delete-archived", (_event, sessionId: unknown) =>
     requireManager().deleteArchivedSession(parseSessionId(sessionId))
+  );
+  ipcMain.handle("sessions:delete-archived-many", (_event, input: unknown) =>
+    requireManager().deleteArchivedSessions(
+      parseArchivedSessionIdsInput(input)
+    )
   );
   ipcMain.handle("sessions:update", (_event, input: unknown) =>
     requireManager().updateTrackedSession(
@@ -268,6 +277,11 @@ function registerIpc(): void {
   ipcMain.handle("project-groups:reorder", (_event, input: unknown) =>
     requireManager().reorderProjectGroups(
       parseReorderProjectGroupsInput(input)
+    )
+  );
+  ipcMain.handle("project-groups:set-collapsed", (_event, input: unknown) =>
+    requireManager().setProjectGroupsCollapsed(
+      parseSetProjectGroupsCollapsedInput(input)
     )
   );
   ipcMain.handle("sessions:dismiss-prompt", (_event, sessionId: unknown) =>
@@ -462,6 +476,21 @@ function parseTrackSessionsInput(input: unknown): TrackSessionsInput {
   const sessionIds = (input as { sessionIds: unknown[] }).sessionIds;
   if (sessionIds.length === 0 || sessionIds.length > 100) {
     throw new TypeError("Wybierz od 1 do 100 czatów.");
+  }
+  return { sessionIds: sessionIds.map(parseSessionId) };
+}
+
+function parseArchivedSessionIdsInput(input: unknown): TrackSessionsInput {
+  if (
+    !input ||
+    typeof input !== "object" ||
+    !Array.isArray((input as { sessionIds?: unknown }).sessionIds)
+  ) {
+    throw new TypeError("Nieprawidłowa lista czatów.");
+  }
+  const sessionIds = (input as { sessionIds: unknown[] }).sessionIds;
+  if (sessionIds.length === 0 || sessionIds.length > 10_000) {
+    throw new TypeError("Wybierz od 1 do 10000 czatów.");
   }
   return { sessionIds: sessionIds.map(parseSessionId) };
 }
@@ -711,6 +740,12 @@ function parseUpdateProjectGroupInput(
   ) {
     throw new TypeError("Nieprawidłowy stan grupy projektu.");
   }
+  if (
+    candidate.sidebarCollapsed !== undefined &&
+    typeof candidate.sidebarCollapsed !== "boolean"
+  ) {
+    throw new TypeError("Nieprawidłowy stan grupy projektu w menu bocznym.");
+  }
   return {
     projectKey: candidate.projectKey,
     ...(candidate.label === undefined ? {} : { label: candidate.label }),
@@ -718,7 +753,10 @@ function parseUpdateProjectGroupInput(
     ...(candidate.color === undefined ? {} : { color: candidate.color }),
     ...(candidate.collapsed === undefined
       ? {}
-      : { collapsed: candidate.collapsed })
+      : { collapsed: candidate.collapsed }),
+    ...(candidate.sidebarCollapsed === undefined
+      ? {}
+      : { sidebarCollapsed: candidate.sidebarCollapsed })
   };
 }
 
@@ -739,4 +777,15 @@ function parseReorderProjectGroupsInput(
     throw new TypeError("Nieprawidłowa kolejność grup.");
   }
   return { projectKeys: [...new Set(projectKeys)] };
+}
+
+function parseSetProjectGroupsCollapsedInput(
+  input: unknown
+): SetProjectGroupsCollapsedInput {
+  const parsed = parseReorderProjectGroupsInput(input);
+  const collapsed = (input as { collapsed?: unknown }).collapsed;
+  if (typeof collapsed !== "boolean") {
+    throw new TypeError("Nieprawidłowy stan grup projektów.");
+  }
+  return { ...parsed, collapsed };
 }

@@ -44,6 +44,12 @@ const BOOTSTRAP_PORT = 47_830;
 const PAIRING_TTL_MS = 60_000;
 const MAX_BODY_BYTES = 64 * 1024;
 const COOKIE_NAME = "__Host-agentsignal-device";
+const TRUSTED_PUSH_HOSTS = new Set([
+  "fcm.googleapis.com",
+  "updates.push.services.mozilla.com",
+  "push.services.mozilla.com",
+  "web.push.apple.com"
+]);
 
 interface MobileGatewayOptions {
   store: MobileStore;
@@ -907,12 +913,14 @@ function sanitizeDeviceName(value: string): string {
   return value.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 80);
 }
 
-function parsePushSubscription(value: unknown): StoredPushSubscription | undefined {
+export function parsePushSubscription(
+  value: unknown
+): StoredPushSubscription | undefined {
   if (!value || typeof value !== "object") return undefined;
   const candidate = value as Partial<StoredPushSubscription>;
   if (
     typeof candidate.endpoint !== "string" ||
-    !candidate.endpoint.startsWith("https://") ||
+    !isTrustedPushEndpoint(candidate.endpoint) ||
     !candidate.keys ||
     typeof candidate.keys.p256dh !== "string" ||
     typeof candidate.keys.auth !== "string"
@@ -930,6 +938,28 @@ function parsePushSubscription(value: unknown): StoredPushSubscription | undefin
       auth: candidate.keys.auth.slice(0, 512)
     }
   };
+}
+
+function isTrustedPushEndpoint(endpoint: string): boolean {
+  if (endpoint.length > 2048) return false;
+  try {
+    const url = new URL(endpoint);
+    if (
+      url.protocol !== "https:" ||
+      url.username ||
+      url.password ||
+      (url.port && url.port !== "443")
+    ) {
+      return false;
+    }
+    const hostname = url.hostname.toLowerCase();
+    return (
+      TRUSTED_PUSH_HOSTS.has(hostname) ||
+      hostname.endsWith(".notify.windows.com")
+    );
+  } catch {
+    return false;
+  }
 }
 
 async function readJsonBody(
