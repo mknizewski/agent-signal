@@ -35,6 +35,9 @@ export function createArchivedSessionRecord(
     ? {
         ...createTrackingRecord(currentSession, record.trackedAt),
         projectName: record.projectName || currentSession.projectName,
+        ...(record.groupOverride === undefined
+          ? {}
+          : { groupOverride: record.groupOverride }),
         pinned: record.pinned ?? false
       }
     : record;
@@ -63,6 +66,9 @@ export function resolveTrackedSessions(
         projectName: autoGroupProjects
           ? current.projectName
           : record.projectName,
+        ...(record.groupOverride === undefined
+          ? {}
+          : { groupOverride: record.groupOverride }),
         pinned: record.pinned ?? false,
         trackedAt: record.trackedAt,
         available: true,

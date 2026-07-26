@@ -40,6 +40,14 @@ interface StoredStateV5 {
   projectGroups: ProjectGroupConfig[];
 }
 
+interface StoredStateV6 {
+  version: 6;
+  trackedSessions: TrackedSessionRecord[];
+  archivedSessions: ArchivedSessionRecord[];
+  preferences: AppPreferences;
+  projectGroups: ProjectGroupConfig[];
+}
+
 export class TrackingStore {
   private readonly filePath: string;
 
@@ -51,7 +59,11 @@ export class TrackingStore {
     try {
       const raw = await readFile(this.filePath, "utf8");
       const parsed = JSON.parse(raw) as Partial<
-        StoredStateV2 | StoredStateV3 | StoredStateV4 | StoredStateV5
+        | StoredStateV2
+        | StoredStateV3
+        | StoredStateV4
+        | StoredStateV5
+        | StoredStateV6
       >;
       if (!Array.isArray(parsed.trackedSessions)) {
         return emptyState();
@@ -84,7 +96,7 @@ export class TrackingStore {
         };
       }
       if (
-        parsed.version === 5 &&
+        (parsed.version === 5 || parsed.version === 6) &&
         Array.isArray(parsed.archivedSessions)
       ) {
         return {
@@ -103,8 +115,8 @@ export class TrackingStore {
   async save(state: TrackingState): Promise<void> {
     await mkdir(path.dirname(this.filePath), { recursive: true });
     const temporaryPath = `${this.filePath}.tmp`;
-    const storedState: StoredStateV5 = {
-      version: 5,
+    const storedState: StoredStateV6 = {
+      version: 6,
       trackedSessions: state.trackedSessions,
       archivedSessions: state.archivedSessions,
       preferences: normalizePreferences(state.preferences),
@@ -131,14 +143,22 @@ function emptyState(): TrackingState {
 function normalizeRecords(
   records: TrackedSessionRecord[]
 ): TrackedSessionRecord[] {
-  return records.map((record) => ({
-    ...record,
-    projectName:
-      typeof record.projectName === "string"
-        ? record.projectName
-        : projectNameFromPath(record.workingDirectory),
-    pinned: record.pinned ?? false
-  }));
+  return records.map((record) => {
+    const { groupOverride: rawGroupOverride, ...rest } = record;
+    const groupOverride =
+      typeof rawGroupOverride === "string"
+        ? rawGroupOverride.trim().slice(0, 80)
+        : undefined;
+    return {
+      ...rest,
+      projectName:
+        typeof record.projectName === "string"
+          ? record.projectName
+          : projectNameFromPath(record.workingDirectory),
+      ...(groupOverride === undefined ? {} : { groupOverride }),
+      pinned: record.pinned ?? false
+    };
+  });
 }
 
 function normalizeArchivedRecords(

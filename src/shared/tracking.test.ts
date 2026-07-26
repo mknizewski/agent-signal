@@ -25,10 +25,10 @@ const session: DiscoveredSession = {
 
 describe("tracking sessions", () => {
   it("creates a durable record and resolves current live status", () => {
-    const record = createTrackingRecord(
-      session,
-      "2026-07-24T12:01:00.000Z"
-    );
+    const record = {
+      ...createTrackingRecord(session, "2026-07-24T12:01:00.000Z"),
+      groupOverride: "payments"
+    };
     const [tracked] = resolveTrackedSessions([record], [
       { ...session, status: "attention" }
     ]);
@@ -49,6 +49,20 @@ describe("tracking sessions", () => {
     expect(tracked.available).toBe(false);
   });
 
+  it("keeps a manual group independent from refreshed source metadata", () => {
+    const record = {
+      ...createTrackingRecord(session),
+      groupOverride: "payments"
+    };
+    const [tracked] = resolveTrackedSessions(
+      [record],
+      [{ ...session, projectName: "portal-renamed" }]
+    );
+
+    expect(tracked.projectName).toBe("portal-renamed");
+    expect(tracked.groupOverride).toBe("payments");
+  });
+
   it("removes tracked sessions from the add-chat catalog", () => {
     const record = createTrackingRecord(session);
     expect(untrackedSessions([record], [session])).toEqual([]);
@@ -56,10 +70,10 @@ describe("tracking sessions", () => {
   });
 
   it("archives the latest session metadata and restores its tracking record", () => {
-    const record = createTrackingRecord(
-      session,
-      "2026-07-24T12:01:00.000Z"
-    );
+    const record = {
+      ...createTrackingRecord(session, "2026-07-24T12:01:00.000Z"),
+      groupOverride: "payments"
+    };
     const archived = createArchivedSessionRecord(
       record,
       { ...session, title: "Naprawione logowanie" },
@@ -67,6 +81,7 @@ describe("tracking sessions", () => {
     );
 
     expect(archived.title).toBe("Naprawione logowanie");
+    expect(archived.groupOverride).toBe("payments");
     expect(archived.archivedAt).toBe("2026-07-24T13:00:00.000Z");
     expect(restoreTrackingRecord(archived)).toEqual({
       ...record,

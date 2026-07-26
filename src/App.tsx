@@ -27,7 +27,10 @@ import {
 import { agentApi, isDemoMode } from "./lib/api";
 import { copyFor, localizeRuntimeText } from "./lib/i18n";
 import { DEFAULT_PREFERENCES } from "./shared/preferences";
-import { groupSessionsByProject } from "./shared/project-groups";
+import {
+  groupSessionsByProject,
+  sessionProjectGroupKey
+} from "./shared/project-groups";
 import {
   projectDropPositionForDirection,
   reorderProjectKeys,
@@ -122,6 +125,13 @@ export default function App() {
   const [projectDropPosition, setProjectDropPosition] =
     useState<ProjectDropPosition | null>(null);
   const draggedProjectKeyRef = useRef<string | null>(null);
+  const [draggedSessionId, setDraggedSessionId] = useState<string | null>(
+    null
+  );
+  const [chatDropTargetKey, setChatDropTargetKey] = useState<string | null>(
+    null
+  );
+  const draggedSessionIdRef = useRef<string | null>(null);
   const [theme, setTheme] = useState<Theme>(() =>
     window.localStorage.getItem("agent-signal-theme") === "light"
       ? "light"
@@ -445,16 +455,29 @@ export default function App() {
   };
 
   const startProjectDrag = (projectKey: string) => {
+    draggedSessionIdRef.current = null;
+    setDraggedSessionId(null);
+    setChatDropTargetKey(null);
     draggedProjectKeyRef.current = projectKey;
     setDraggedProjectKey(projectKey);
     setProjectDropTargetKey(null);
     setProjectDropPosition(null);
   };
 
-  const archiveProjectGroup = async (projectKey: string) => {
-    const sessionIds = snapshot.trackedSessions
-      .filter((session) => session.projectName.trim() === projectKey)
-      .map((session) => session.id);
+  const assignSessionGroup = async (
+    sessionId: string,
+    groupOverride: string | null
+  ) => {
+    try {
+      setSnapshot(
+        await agentApi.updateTrackedSession({ sessionId, groupOverride })
+      );
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const archiveProjectGroup = async (sessionIds: string[]) => {
     if (sessionIds.length === 0) return;
     setSnapshot(await agentApi.archiveSessions({ sessionIds }));
     setToast(copy.groups.archiveAllSuccess(sessionIds.length));
@@ -467,7 +490,8 @@ export default function App() {
       title: copy.groups.archiveAllTitle(group.name),
       description: copy.groups.archiveAllDescription(group.sessions.length),
       confirmLabel: copy.groups.archiveAll,
-      run: () => archiveProjectGroup(projectKey)
+      run: () =>
+        archiveProjectGroup(group.sessions.map((session) => session.id))
     });
   };
 
@@ -536,6 +560,49 @@ export default function App() {
     setDraggedProjectKey(null);
     setProjectDropTargetKey(null);
     setProjectDropPosition(null);
+  };
+
+  const startChatDrag = (sessionId: string) => {
+    cancelProjectDrag();
+    draggedSessionIdRef.current = sessionId;
+    setDraggedSessionId(sessionId);
+    setChatDropTargetKey(null);
+  };
+
+  const hoverChatDrag = (targetProjectKey: string) => {
+    const sessionId = draggedSessionIdRef.current;
+    const session = snapshot.trackedSessions.find(
+      (item) => item.id === sessionId
+    );
+    if (
+      !session ||
+      sessionProjectGroupKey(session) === targetProjectKey
+    ) {
+      setChatDropTargetKey(null);
+      return;
+    }
+    setChatDropTargetKey(targetProjectKey);
+  };
+
+  const cancelChatDrag = () => {
+    draggedSessionIdRef.current = null;
+    setDraggedSessionId(null);
+    setChatDropTargetKey(null);
+  };
+
+  const dropChat = (targetProjectKey: string) => {
+    const sessionId = draggedSessionIdRef.current;
+    const session = snapshot.trackedSessions.find(
+      (item) => item.id === sessionId
+    );
+    if (
+      sessionId &&
+      session &&
+      sessionProjectGroupKey(session) !== targetProjectKey
+    ) {
+      void assignSessionGroup(sessionId, targetProjectKey);
+    }
+    cancelChatDrag();
   };
 
   const dropProject = (
@@ -1110,9 +1177,24 @@ export default function App() {
                     <section
                       className={`project-group ${
                         group.collapsed ? "is-collapsed" : ""
+                      } ${
+                        chatDropTargetKey === group.key
+                          ? "is-chat-drop-target"
+                          : ""
                       }`}
                       key={group.key}
+                      style={
+                        {
+                          "--project-color": group.color
+                        } as CSSProperties
+                      }
                       onDragOver={(event) => {
+                        if (draggedSessionIdRef.current) {
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = "move";
+                          hoverChatDrag(group.key);
+                          return;
+                        }
                         if (
                           !draggedProjectKey ||
                           draggedProjectKey === group.key
@@ -1123,7 +1205,23 @@ export default function App() {
                         event.dataTransfer.dropEffect = "move";
                         hoverProjectDrag(group.key, "after");
                       }}
+                      onDragLeave={(event) => {
+                        const nextTarget = event.relatedTarget;
+                        if (
+                          draggedSessionIdRef.current &&
+                          (!(nextTarget instanceof Node) ||
+                            !event.currentTarget.contains(nextTarget))
+                        ) {
+                          setChatDropTargetKey(null);
+                        }
+                      }}
                       onDrop={(event) => {
+                        if (draggedSessionIdRef.current) {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          dropChat(group.key);
+                          return;
+                        }
                         if (
                           !draggedProjectKey ||
                           draggedProjectKey === group.key
@@ -1146,6 +1244,7 @@ export default function App() {
                           language={snapshot.preferences.language}
                           draggable={allProjectGroups.length > 1}
                           dragging={draggedProjectKey === group.key}
+                          chatDragging={draggedSessionId !== null}
                           dropPosition={
                             draggedProjectKey !== null &&
                             projectDropTargetKey === group.key
@@ -1178,6 +1277,11 @@ export default function App() {
                               onOpen={openSession}
                               onOpenSubagent={openCodexThread}
                               onTogglePin={togglePin}
+                              projectGroups={allProjectGroups}
+                              onAssignGroup={assignSessionGroup}
+                              dragging={draggedSessionId === session.id}
+                              onDragStart={startChatDrag}
+                              onDragEnd={cancelChatDrag}
                             />
                           ))}
                         </div>

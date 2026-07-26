@@ -634,6 +634,7 @@ function parseUpdateTrackedSessionInput(
     sessionId?: unknown;
     pinned?: unknown;
     projectName?: unknown;
+    groupOverride?: unknown;
   };
   const result: UpdateTrackedSessionInput = {
     sessionId: parseSessionId(candidate.sessionId)
@@ -652,6 +653,16 @@ function parseUpdateTrackedSessionInput(
       throw new TypeError("Nieprawidłowa nazwa projektu.");
     }
     result.projectName = candidate.projectName;
+  }
+  if (candidate.groupOverride !== undefined) {
+    if (
+      candidate.groupOverride !== null &&
+      (typeof candidate.groupOverride !== "string" ||
+        candidate.groupOverride.length > 80)
+    ) {
+      throw new TypeError("Nieprawidłowe przypisanie grupy.");
+    }
+    result.groupOverride = candidate.groupOverride;
   }
   return result;
 }

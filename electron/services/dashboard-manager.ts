@@ -208,6 +208,10 @@ export class DashboardManager {
     if (typeof input.projectName === "string") {
       record.projectName = input.projectName.trim().slice(0, 80);
     }
+    if (input.groupOverride !== undefined) {
+      if (input.groupOverride === null) delete record.groupOverride;
+      else record.groupOverride = input.groupOverride.trim().slice(0, 80);
+    }
     this.persistAndEmit();
     return this.getSnapshot();
   }
