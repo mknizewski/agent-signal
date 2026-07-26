@@ -160,7 +160,10 @@ export function MobileDevicesModal({
             <MonitorSmartphone size={20} />
           </span>
           <div>
-            <h2 id="mobile-devices-title">{copy.mobile.title}</h2>
+            <div className="mobile-devices-modal__title">
+              <h2 id="mobile-devices-title">{copy.mobile.title}</h2>
+              <span>{copy.mobile.preview}</span>
+            </div>
             <p>{copy.mobile.subtitle}</p>
           </div>
           <button

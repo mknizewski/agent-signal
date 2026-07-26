@@ -1,11 +1,19 @@
-import { Archive, ExternalLink, Pin, PinOff } from "lucide-react";
+import {
+  Archive,
+  ExternalLink,
+  GripVertical,
+  Pin,
+  PinOff
+} from "lucide-react";
 import type {
   AppPreferences,
   TrackedSession
 } from "../shared/types";
 import { formatRelativeTime, statusLabel } from "../shared/status";
 import { isSessionSleeping } from "../shared/preferences";
+import { CHAT_SESSION_DRAG_TYPE } from "../shared/project-groups";
 import { copyFor, localizeRuntimeText } from "../lib/i18n";
+import { ChatGroupMenu } from "./ChatGroupMenu";
 import { StatusPet } from "./StatusPet";
 import { SubagentTeamPanel } from "./SubagentTeamPanel";
 
@@ -17,6 +25,16 @@ interface TrackedChatRowProps {
   onOpen(sessionId: string): void;
   onOpenSubagent(threadId: string): void;
   onTogglePin(sessionId: string, pinned: boolean): void;
+  projectGroups: Array<{
+    key: string;
+    name: string;
+    symbol: string;
+    color: string;
+  }>;
+  onAssignGroup(sessionId: string, groupOverride: string | null): void;
+  dragging: boolean;
+  onDragStart(sessionId: string): void;
+  onDragEnd(): void;
 }
 
 export function TrackedChatRow({
@@ -26,7 +44,12 @@ export function TrackedChatRow({
   onArchive,
   onOpen,
   onOpenSubagent,
-  onTogglePin
+  onTogglePin,
+  projectGroups,
+  onAssignGroup,
+  dragging,
+  onDragStart,
+  onDragEnd
 }: TrackedChatRowProps) {
   const copy = copyFor(preferences.language);
   const sleeping = isSessionSleeping(
@@ -44,21 +67,55 @@ export function TrackedChatRow({
       id={`session-${session.id}`}
       className={`chat-row ${session.pinned ? "chat-row--pinned" : ""} ${
         visibleSubagents.length > 0 ? "chat-row--has-team" : ""
-      }`}
+      } ${dragging ? "is-dragging" : ""}`}
+      draggable={preferences.groupTrackedByProject}
+      onDragStart={(event) => {
+        const actionButton = (event.target as HTMLElement).closest("button");
+        if (
+          actionButton &&
+          !actionButton.classList.contains("chat-row__drag")
+        ) {
+          event.preventDefault();
+          return;
+        }
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData(CHAT_SESSION_DRAG_TYPE, session.id);
+        event.dataTransfer.setData("text/plain", session.id);
+        event.dataTransfer.setDragImage(event.currentTarget, 48, 28);
+        onDragStart(session.id);
+      }}
+      onDragEnd={onDragEnd}
       onDoubleClick={(event) => {
         if (
           preferences.openChatOnDoubleClick &&
-          !(event.target as HTMLElement).closest("button")
+          !(event.target as HTMLElement).closest("button, select")
         ) {
           onOpen(session.id);
         }
       }}
     >
-      <div
-        className={`status-light status-light--${session.status}`}
-        title={session.statusText}
-        aria-label={statusLabel(session.status, preferences.language)}
-      />
+      {preferences.groupTrackedByProject ? (
+        <button
+          className="chat-row__drag"
+          type="button"
+          draggable
+          title={copy.row.dragToGroup}
+          aria-label={`${copy.row.dragToGroup}: ${session.title}`}
+        >
+          <span
+            className={`status-light status-light--${session.status}`}
+            title={session.statusText}
+            aria-hidden="true"
+          />
+          <GripVertical size={13} />
+        </button>
+      ) : (
+        <div
+          className={`status-light status-light--${session.status}`}
+          title={session.statusText}
+          aria-label={statusLabel(session.status, preferences.language)}
+        />
+      )}
 
       <StatusPet
         agent={session.agent}
@@ -95,6 +152,16 @@ export function TrackedChatRow({
       </time>
 
       <div className="chat-row__actions">
+        {preferences.groupTrackedByProject && (
+          <ChatGroupMenu
+            session={session}
+            language={preferences.language}
+            projectGroups={projectGroups}
+            onAssign={(groupOverride) =>
+              onAssignGroup(session.id, groupOverride)
+            }
+          />
+        )}
         {preferences.enablePinning && (
           <button
             className={`row-action ${session.pinned ? "is-active" : ""}`}

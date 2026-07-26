@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.6.2" src="https://img.shields.io/badge/version-0.6.2-e85d6a" />
+  <img alt="Version 0.6.3" src="https://img.shields.io/badge/version-0.6.3-e85d6a" />
   <img alt="Windows 10 and 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-2563eb" />
   <img alt="Polish and English" src="https://img.shields.io/badge/UI-Polski%20%7C%20English-7b6fe5" />
   <img alt="MIT License" src="https://img.shields.io/badge/license-MIT-3db47a" />
@@ -28,7 +28,22 @@ answers approval requests, or deletes the source conversation.
 > Every screenshot in this README uses built-in demonstration data. No real
 > conversation, account, or local project path is shown.
 
-## What is new in 0.6.2
+## What is new in 0.6.3
+
+Version 0.6.3 adds independent chat organization:
+
+- watched chats can be assigned manually to any visible project group,
+  independently of the project detected by Codex or Claude Code;
+- assignments use a dashboard-native group menu, and chats can also be dragged
+  between project sections;
+- selecting the automatic option removes the manual assignment and restores
+  the existing source-based grouping behavior;
+- chats can also be detached into the dedicated no-project group;
+- manual assignments survive source refreshes, app restarts, archiving, and
+  restoring;
+- the mobile-device connection window is marked as a Preview feature.
+
+## What was new in 0.6.2
 
 Version 0.6.2 focuses on clarity and lighter interaction:
 
@@ -255,7 +270,7 @@ written naturally for each language.
 </p>
 
 The product name is displayed as **Agent Signal** throughout the installer,
-Start menu, desktop shortcut, and installed-app list. Version 0.6.2 targets
+Start menu, desktop shortcut, and installed-app list. Version 0.6.3 targets
 Windows 10 and Windows 11 on x64 and works with Codex, Claude Code, or both.
 
 ### Run from source
