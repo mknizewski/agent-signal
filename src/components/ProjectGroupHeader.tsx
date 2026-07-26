@@ -8,6 +8,7 @@ import {
   GripVertical,
   Pencil,
   RotateCcw,
+  Trash2,
   X
 } from "lucide-react";
 import type {
@@ -20,29 +21,41 @@ import { copyFor } from "../lib/i18n";
 interface ProjectGroupHeaderProps {
   group: ProjectGroupPresentation;
   count: number;
+  totalCount: number;
   language: AppLanguage;
   draggable: boolean;
   dragging: boolean;
-  dropTarget: boolean;
+  dropPosition: "before" | "after" | null;
   onUpdate(input: UpdateProjectGroupInput): Promise<void>;
-  onPointerStart(projectKey: string): void;
-  onPointerHover(projectKey: string): void;
-  onPointerDrop(projectKey: string): void;
-  onPointerCancel(): void;
+  onDragStart(projectKey: string): void;
+  onDragHover(
+    projectKey: string,
+    position: "before" | "after"
+  ): void;
+  onDragDrop(
+    projectKey: string,
+    position: "before" | "after"
+  ): void;
+  onMove(projectKey: string, direction: -1 | 1): void;
+  onArchiveAll(projectKey: string): void;
+  onDragCancel(): void;
 }
 
 export function ProjectGroupHeader({
   group,
   count,
+  totalCount,
   language,
   draggable,
   dragging,
-  dropTarget,
+  dropPosition,
   onUpdate,
-  onPointerStart,
-  onPointerHover,
-  onPointerDrop,
-  onPointerCancel
+  onDragStart,
+  onDragHover,
+  onDragDrop,
+  onMove,
+  onArchiveAll,
+  onDragCancel
 }: ProjectGroupHeaderProps) {
   const copy = copyFor(language);
   const [editing, setEditing] = useState(false);
@@ -50,11 +63,6 @@ export function ProjectGroupHeader({
   const [symbol, setSymbol] = useState(group.symbol);
   const [color, setColor] = useState(group.color);
   const [busy, setBusy] = useState(false);
-
-  const projectKeyAt = (clientX: number, clientY: number) =>
-    document
-      .elementFromPoint(clientX, clientY)
-      ?.closest<HTMLElement>("[data-project-key]")?.dataset.projectKey;
 
   useEffect(() => {
     if (editing) return;
@@ -97,53 +105,59 @@ export function ProjectGroupHeader({
     <header
       className={`project-group__header ${
         dragging ? "is-dragging" : ""
-      } ${dropTarget ? "is-drop-target" : ""} ${
+      } ${dropPosition ? `is-drop-${dropPosition}` : ""} ${
         editing ? "is-editing" : ""
       }`}
       data-project-key={group.key}
       style={{ "--project-color": group.color } as CSSProperties}
-      onPointerEnter={() => onPointerHover(group.key)}
-      onPointerUp={() => onPointerDrop(group.key)}
+      onDragOver={(event) => {
+        if (!draggable) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        const bounds = event.currentTarget.getBoundingClientRect();
+        const position =
+          event.clientY < bounds.top + bounds.height / 2
+            ? "before"
+            : "after";
+        onDragHover(group.key, position);
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        const bounds = event.currentTarget.getBoundingClientRect();
+        const position =
+          event.clientY < bounds.top + bounds.height / 2
+            ? "before"
+            : "after";
+        onDragDrop(group.key, position);
+      }}
     >
       <div className="project-group__identity">
         {draggable && (
-          <span
+          <button
             className="project-group__drag"
+            type="button"
+            draggable
             title={copy.groups.drag}
             aria-label={copy.groups.drag}
-            onPointerDown={(event) => {
-              if (event.button !== 0) return;
-              if (event.pointerType === "mouse") return;
-              event.preventDefault();
-              event.currentTarget.setPointerCapture(event.pointerId);
-              onPointerStart(group.key);
+            aria-keyshortcuts="ArrowUp ArrowDown"
+            onDragStart={(event) => {
+              event.dataTransfer.effectAllowed = "move";
+              event.dataTransfer.setData("text/plain", group.key);
+              const header = event.currentTarget.closest("header");
+              if (header) event.dataTransfer.setDragImage(header, 24, 18);
+              onDragStart(group.key);
             }}
-            onMouseDown={(event) => {
-              if (event.button !== 0) return;
-              event.preventDefault();
-              onPointerStart(group.key);
-            }}
-            onPointerMove={(event) => {
-              if (!event.currentTarget.hasPointerCapture(event.pointerId)) {
+            onDragEnd={onDragCancel}
+            onKeyDown={(event) => {
+              if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {
                 return;
               }
-              const projectKey = projectKeyAt(event.clientX, event.clientY);
-              if (projectKey) onPointerHover(projectKey);
+              event.preventDefault();
+              onMove(group.key, event.key === "ArrowUp" ? -1 : 1);
             }}
-            onPointerUp={(event) => {
-              if (!event.currentTarget.hasPointerCapture(event.pointerId)) {
-                onPointerCancel();
-                return;
-              }
-              const projectKey =
-                projectKeyAt(event.clientX, event.clientY) || group.key;
-              event.currentTarget.releasePointerCapture(event.pointerId);
-              onPointerDrop(projectKey);
-            }}
-            onPointerCancel={onPointerCancel}
           >
             <GripVertical size={15} />
-          </span>
+          </button>
         )}
         <button
           className="project-group__collapse"
@@ -173,6 +187,16 @@ export function ProjectGroupHeader({
           onClick={() => setEditing((current) => !current)}
         >
           {editing ? <X size={14} /> : <Pencil size={13} />}
+        </button>
+        <button
+          className="project-group__delete"
+          type="button"
+          title={copy.groups.archiveAll}
+          aria-label={`${copy.groups.archiveAll}: ${group.name}`}
+          disabled={busy || totalCount === 0}
+          onClick={() => onArchiveAll(group.key)}
+        >
+          <Trash2 size={13} />
         </button>
       </div>
 

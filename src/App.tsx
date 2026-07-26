@@ -10,6 +10,7 @@ import {
   Archive,
   Bot,
   ChevronDown,
+  ChevronUp,
   Circle,
   Moon,
   PanelLeftClose,
@@ -20,12 +21,19 @@ import {
   Settings,
   SlidersHorizontal,
   Smartphone,
-  Sun
+  Sun,
+  Trash2
 } from "lucide-react";
 import { agentApi, isDemoMode } from "./lib/api";
 import { copyFor, localizeRuntimeText } from "./lib/i18n";
 import { DEFAULT_PREFERENCES } from "./shared/preferences";
 import { groupSessionsByProject } from "./shared/project-groups";
+import {
+  projectDropPositionForDirection,
+  reorderProjectKeys,
+  type ProjectDropPosition
+} from "./shared/project-order";
+import { isCompactModeShortcut } from "./shared/shortcuts";
 import type {
   AgentKind,
   AppPreferences,
@@ -44,6 +52,7 @@ import { ArchivedChatRow } from "./components/ArchivedChatRow";
 import { AppTitleBar } from "./components/AppTitleBar";
 import { ChatPickerModal } from "./components/ChatPickerModal";
 import { CompactDashboard } from "./components/CompactDashboard";
+import { ConfirmDialog } from "./components/ConfirmDialog";
 import { MobileDevicesModal } from "./components/MobileDevicesModal";
 import { NewSessionPrompt } from "./components/NewSessionPrompt";
 import { ProjectGroupHeader } from "./components/ProjectGroupHeader";
@@ -58,6 +67,13 @@ type ViewFilter =
   | "archive"
   | "settings";
 type Theme = "light" | "dark";
+
+interface PendingConfirmation {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  run(): Promise<void>;
+}
 
 const emptySnapshot: AppSnapshot = {
   trackedSessions: [],
@@ -94,14 +110,18 @@ export default function App() {
   const [now, setNow] = useState(new Date());
   const [toast, setToast] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [confirmation, setConfirmation] =
+    useState<PendingConfirmation | null>(null);
+  const [confirmationBusy, setConfirmationBusy] = useState(false);
   const [draggedProjectKey, setDraggedProjectKey] = useState<string | null>(
     null
   );
   const [projectDropTargetKey, setProjectDropTargetKey] = useState<
     string | null
   >(null);
+  const [projectDropPosition, setProjectDropPosition] =
+    useState<ProjectDropPosition | null>(null);
   const draggedProjectKeyRef = useRef<string | null>(null);
-  const hoveredProjectKeyRef = useRef<string | null>(null);
   const [theme, setTheme] = useState<Theme>(() =>
     window.localStorage.getItem("agent-signal-theme") === "light"
       ? "light"
@@ -114,6 +134,9 @@ export default function App() {
     () =>
       window.localStorage.getItem("agent-signal-sidebar-collapsed") === "true"
   );
+  const [sidebarPeeked, setSidebarPeeked] = useState(false);
+  const sidebarPeekTimerRef = useRef<number | null>(null);
+  const sidebarFocusedRef = useRef(false);
   const copy = copyFor(snapshot.preferences.language);
 
   useEffect(() => {
@@ -139,11 +162,35 @@ export default function App() {
   }, [compact]);
 
   useEffect(() => {
+    const toggleCompactFromKeyboard = (event: KeyboardEvent) => {
+      if (!isCompactModeShortcut(event)) return;
+      event.preventDefault();
+      setCompact((current) => !current);
+    };
+    window.addEventListener("keydown", toggleCompactFromKeyboard);
+    return () =>
+      window.removeEventListener("keydown", toggleCompactFromKeyboard);
+  }, []);
+
+  useEffect(() => {
     window.localStorage.setItem(
       "agent-signal-sidebar-collapsed",
       String(sidebarCollapsed)
     );
   }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    if (!sidebarCollapsed) setSidebarPeeked(false);
+  }, [sidebarCollapsed]);
+
+  useEffect(
+    () => () => {
+      if (sidebarPeekTimerRef.current !== null) {
+        window.clearTimeout(sidebarPeekTimerRef.current);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     document.documentElement.lang = snapshot.preferences.language;
@@ -278,6 +325,19 @@ export default function App() {
     setToast(localizeRuntimeText(message, snapshot.preferences.language));
   }
 
+  const confirmPendingAction = async () => {
+    if (!confirmation) return;
+    setConfirmationBusy(true);
+    try {
+      await confirmation.run();
+      setConfirmation(null);
+    } catch (error) {
+      showError(error);
+    } finally {
+      setConfirmationBusy(false);
+    }
+  };
+
   const refresh = async () => {
     setRefreshing(true);
     try {
@@ -311,23 +371,35 @@ export default function App() {
     }
   };
 
-  const deleteArchivedSession = async (sessionId: string) => {
+  const deleteArchivedSession = (sessionId: string) => {
     const session = snapshot.archivedSessions.find(
       (item) => item.id === sessionId
     );
-    if (
-      !window.confirm(
-        copy.app.archiveDeleteConfirm(session?.title ?? copy.app.chatColumn)
-      )
-    ) {
-      return;
-    }
-    try {
-      setSnapshot(await agentApi.deleteArchivedSession(sessionId));
-      setToast(copy.app.deleteSuccess);
-    } catch (error) {
-      showError(error);
-    }
+    setConfirmation({
+      title: copy.app.archiveDeleteTitle,
+      description: copy.app.archiveDeleteDescription(
+        session?.title ?? copy.app.chatColumn
+      ),
+      confirmLabel: copy.common.delete,
+      run: async () => {
+        setSnapshot(await agentApi.deleteArchivedSession(sessionId));
+        setToast(copy.app.deleteSuccess);
+      }
+    });
+  };
+
+  const deleteAllArchivedSessions = () => {
+    const sessionIds = snapshot.archivedSessions.map((session) => session.id);
+    if (sessionIds.length === 0) return;
+    setConfirmation({
+      title: copy.app.deleteAllArchiveTitle,
+      description: copy.app.deleteAllArchiveDescription(sessionIds.length),
+      confirmLabel: copy.app.deleteAllArchive,
+      run: async () => {
+        setSnapshot(await agentApi.deleteArchivedSessions({ sessionIds }));
+        setToast(copy.app.deleteAllArchiveSuccess(sessionIds.length));
+      }
+    });
   };
 
   const updatePreferences = async (patch: Partial<AppPreferences>) => {
@@ -374,26 +446,39 @@ export default function App() {
 
   const startProjectDrag = (projectKey: string) => {
     draggedProjectKeyRef.current = projectKey;
-    hoveredProjectKeyRef.current = projectKey;
     setDraggedProjectKey(projectKey);
-    setProjectDropTargetKey(projectKey);
+    setProjectDropTargetKey(null);
+    setProjectDropPosition(null);
   };
 
-  const reorderProjectBefore = async (
-    sourceProjectKey: string,
-    targetProjectKey: string
-  ) => {
+  const archiveProjectGroup = async (projectKey: string) => {
+    const sessionIds = snapshot.trackedSessions
+      .filter((session) => session.projectName.trim() === projectKey)
+      .map((session) => session.id);
+    if (sessionIds.length === 0) return;
+    setSnapshot(await agentApi.archiveSessions({ sessionIds }));
+    setToast(copy.groups.archiveAllSuccess(sessionIds.length));
+  };
+
+  const requestArchiveProjectGroup = (projectKey: string) => {
+    const group = allProjectGroups.find((item) => item.key === projectKey);
+    if (!group || group.sessions.length === 0) return;
+    setConfirmation({
+      title: copy.groups.archiveAllTitle(group.name),
+      description: copy.groups.archiveAllDescription(group.sessions.length),
+      confirmLabel: copy.groups.archiveAll,
+      run: () => archiveProjectGroup(projectKey)
+    });
+  };
+
+  const setAllProjectGroupsCollapsed = async (collapsed: boolean) => {
     const projectKeys = allProjectGroups.map((group) => group.key);
-    const withoutSource = projectKeys.filter(
-      (projectKey) => projectKey !== sourceProjectKey
-    );
-    const targetIndex = withoutSource.indexOf(targetProjectKey);
-    if (targetIndex < 0) return;
-    withoutSource.splice(targetIndex, 0, sourceProjectKey);
+    if (projectKeys.length === 0) return;
     try {
       setSnapshot(
-        await agentApi.reorderProjectGroups({
-          projectKeys: withoutSource
+        await agentApi.setProjectGroupsCollapsed({
+          projectKeys,
+          collapsed
         })
       );
     } catch (error) {
@@ -401,59 +486,107 @@ export default function App() {
     }
   };
 
-  const hoverProjectDrag = (projectKey: string) => {
+  const reorderProject = async (
+    sourceProjectKey: string,
+    targetProjectKey: string,
+    position: ProjectDropPosition
+  ) => {
+    const projectKeys = allProjectGroups.map((group) => group.key);
+    const reorderedProjectKeys = reorderProjectKeys(
+      projectKeys,
+      sourceProjectKey,
+      targetProjectKey,
+      position
+    );
+    if (reorderedProjectKeys === projectKeys) return;
+    try {
+      setSnapshot(
+        await agentApi.reorderProjectGroups({
+          projectKeys: reorderedProjectKeys
+        })
+      );
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const hoverProjectDrag = (
+    projectKey: string,
+    _position: ProjectDropPosition
+  ) => {
     const sourceProjectKey = draggedProjectKeyRef.current;
-    if (
-      !sourceProjectKey ||
-      hoveredProjectKeyRef.current === projectKey
-    ) {
+    const position = sourceProjectKey
+      ? projectDropPositionForDirection(
+          allProjectGroups.map((group) => group.key),
+          sourceProjectKey,
+          projectKey
+        )
+      : null;
+    if (!position) {
+      setProjectDropTargetKey(null);
+      setProjectDropPosition(null);
       return;
     }
-    hoveredProjectKeyRef.current = projectKey;
     setProjectDropTargetKey(projectKey);
+    setProjectDropPosition(position);
   };
 
-  const dropProject = (targetProjectKey: string) => {
-    const sourceProjectKey = draggedProjectKeyRef.current;
-    const hoveredProjectKey =
-      hoveredProjectKeyRef.current || targetProjectKey;
-    if (sourceProjectKey && hoveredProjectKey !== sourceProjectKey) {
-      void reorderProjectBefore(sourceProjectKey, hoveredProjectKey);
-    }
+  const cancelProjectDrag = () => {
     draggedProjectKeyRef.current = null;
-    hoveredProjectKeyRef.current = null;
     setDraggedProjectKey(null);
     setProjectDropTargetKey(null);
+    setProjectDropPosition(null);
   };
 
-  useEffect(() => {
-    const projectKeyAt = (clientX: number, clientY: number) =>
-      document
-        .elementFromPoint(clientX, clientY)
-        ?.closest<HTMLElement>("[data-project-key]")?.dataset.projectKey;
+  const dropProject = (
+    targetProjectKey: string,
+    _position: ProjectDropPosition
+  ) => {
+    const sourceProjectKey = draggedProjectKeyRef.current;
+    const position = sourceProjectKey
+      ? projectDropPositionForDirection(
+          allProjectGroups.map((group) => group.key),
+          sourceProjectKey,
+          targetProjectKey
+        )
+      : null;
+    if (sourceProjectKey && position) {
+      void reorderProject(sourceProjectKey, targetProjectKey, position);
+    }
+    cancelProjectDrag();
+  };
 
-    const handleMouseMove = (event: MouseEvent) => {
-      if (!draggedProjectKeyRef.current) return;
-      const projectKey = projectKeyAt(event.clientX, event.clientY);
-      if (projectKey) hoverProjectDrag(projectKey);
-    };
+  const moveProject = (projectKey: string, direction: -1 | 1) => {
+    const projectKeys = allProjectGroups.map((group) => group.key);
+    const currentIndex = projectKeys.indexOf(projectKey);
+    const targetKey = projectKeys[currentIndex + direction];
+    if (!targetKey) return;
+    void reorderProject(
+      projectKey,
+      targetKey,
+      direction < 0 ? "before" : "after"
+    );
+  };
 
-    const handleMouseUp = (event: MouseEvent) => {
-      if (!draggedProjectKeyRef.current) return;
-      const projectKey =
-        projectKeyAt(event.clientX, event.clientY) ||
-        hoveredProjectKeyRef.current ||
-        draggedProjectKeyRef.current;
-      dropProject(projectKey);
-    };
+  const clearSidebarPeekTimer = () => {
+    if (sidebarPeekTimerRef.current === null) return;
+    window.clearTimeout(sidebarPeekTimerRef.current);
+    sidebarPeekTimerRef.current = null;
+  };
 
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  });
+  const scheduleSidebarPeek = () => {
+    if (!sidebarCollapsed || sidebarPeeked) return;
+    clearSidebarPeekTimer();
+    sidebarPeekTimerRef.current = window.setTimeout(() => {
+      sidebarPeekTimerRef.current = null;
+      setSidebarPeeked(true);
+    }, 450);
+  };
+
+  const hideSidebarPeek = () => {
+    clearSidebarPeekTimer();
+    if (!sidebarFocusedRef.current) setSidebarPeeked(false);
+  };
 
   const observePromptedSession = async (sessionId: string) => {
     try {
@@ -507,22 +640,41 @@ export default function App() {
 
   const settingsView = filter === "settings";
   const archiveView = filter === "archive";
+  const effectiveSidebarCollapsed = sidebarCollapsed && !sidebarPeeked;
 
   return (
     <div className="app-frame">
       <AppTitleBar
         language={snapshot.preferences.language}
-        onToggleCompact={() => setCompact(true)}
+        onToggleCompact={() => setCompact((current) => !current)}
+        onOpenSettings={() => setFilter("settings")}
       />
       <div
         className={`app-shell ${
           sidebarCollapsed ? "is-sidebar-collapsed" : ""
-        }`}
+        } ${sidebarPeeked ? "is-sidebar-peeking" : ""}`}
       >
         <aside
           className={`sidebar ${
-            sidebarCollapsed ? "sidebar--collapsed" : ""
-          }`}
+            effectiveSidebarCollapsed ? "sidebar--collapsed" : ""
+          } ${sidebarPeeked ? "sidebar--peeked" : ""}`}
+          onPointerEnter={scheduleSidebarPeek}
+          onPointerLeave={hideSidebarPeek}
+          onFocusCapture={() => {
+            sidebarFocusedRef.current = true;
+            clearSidebarPeekTimer();
+            if (sidebarCollapsed) setSidebarPeeked(true);
+          }}
+          onBlurCapture={(event) => {
+            if (
+              event.relatedTarget instanceof Node &&
+              event.currentTarget.contains(event.relatedTarget)
+            ) {
+              return;
+            }
+            sidebarFocusedRef.current = false;
+            setSidebarPeeked(false);
+          }}
         >
           <div className="brand">
             <span className="brand-mark">
@@ -544,9 +696,16 @@ export default function App() {
                   ? copy.app.expandSidebar
                   : copy.app.collapseSidebar
               }
-              onClick={() => setSidebarCollapsed((current) => !current)}
+              onClick={(event) => {
+                if (!sidebarCollapsed) {
+                  sidebarFocusedRef.current = false;
+                  event.currentTarget.blur();
+                }
+                setSidebarCollapsed((current) => !current);
+                setSidebarPeeked(false);
+              }}
             >
-              {sidebarCollapsed ? (
+              {effectiveSidebarCollapsed ? (
                 <PanelLeftOpen size={16} />
               ) : (
                 <PanelLeftClose size={16} />
@@ -639,7 +798,22 @@ export default function App() {
                       key={group.key}
                     >
                       {snapshot.preferences.groupTrackedByProject && (
-                        <small>
+                        <button
+                          className="sidebar-watched__group-toggle"
+                          type="button"
+                          aria-expanded={!group.sidebarCollapsed}
+                          title={
+                            group.sidebarCollapsed
+                              ? copy.groups.expand
+                              : copy.groups.collapse
+                          }
+                          onClick={() =>
+                            void updateProjectGroup({
+                              projectKey: group.key,
+                              sidebarCollapsed: !group.sidebarCollapsed
+                            })
+                          }
+                        >
                           <i
                             style={
                               {
@@ -650,21 +824,29 @@ export default function App() {
                             {group.symbol}
                           </i>
                           <span>{group.name}</span>
-                        </small>
-                      )}
-                      {group.sessions.map((session) => (
-                        <button
-                          type="button"
-                          key={session.id}
-                          title={session.title}
-                          onClick={() => focusSession(session.id)}
-                        >
-                          <i
-                            className={`legend-dot legend-dot--${session.status}`}
+                          <ChevronDown
+                            className={
+                              group.sidebarCollapsed ? "is-collapsed" : ""
+                            }
+                            size={12}
                           />
-                          <span>{session.title}</span>
                         </button>
-                      ))}
+                      )}
+                      {(!snapshot.preferences.groupTrackedByProject ||
+                        !group.sidebarCollapsed) &&
+                        group.sessions.map((session) => (
+                          <button
+                            type="button"
+                            key={session.id}
+                            title={session.title}
+                            onClick={() => focusSession(session.id)}
+                          >
+                            <i
+                              className={`legend-dot legend-dot--${session.status}`}
+                            />
+                            <span>{session.title}</span>
+                          </button>
+                        ))}
                     </div>
                   ))
                 )}
@@ -858,6 +1040,45 @@ export default function App() {
                     }
                   />
                 </label>
+                {archiveView &&
+                  snapshot.archivedSessions.length > 0 && (
+                    <button
+                      className="button button--danger archive-clear-button"
+                      type="button"
+                      onClick={deleteAllArchivedSessions}
+                    >
+                      <Trash2 size={14} />
+                      {copy.app.deleteAllArchive}
+                    </button>
+                  )}
+                {!archiveView &&
+                  snapshot.preferences.groupTrackedByProject &&
+                  allProjectGroups.length > 0 && (
+                    <div className="group-visibility-actions">
+                      <button
+                        className="button button--secondary"
+                        type="button"
+                        title={copy.app.collapseAllGroups}
+                        onClick={() =>
+                          void setAllProjectGroupsCollapsed(true)
+                        }
+                      >
+                        <ChevronUp size={14} />
+                        {copy.app.collapseAllGroups}
+                      </button>
+                      <button
+                        className="button button--secondary"
+                        type="button"
+                        title={copy.app.expandAllGroups}
+                        onClick={() =>
+                          void setAllProjectGroupsCollapsed(false)
+                        }
+                      >
+                        <ChevronDown size={14} />
+                        {copy.app.expandAllGroups}
+                      </button>
+                    </div>
+                  )}
                 <span>
                   {archiveView
                     ? countLabel(
@@ -891,28 +1112,53 @@ export default function App() {
                         group.collapsed ? "is-collapsed" : ""
                       }`}
                       key={group.key}
+                      onDragOver={(event) => {
+                        if (
+                          !draggedProjectKey ||
+                          draggedProjectKey === group.key
+                        ) {
+                          return;
+                        }
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = "move";
+                        hoverProjectDrag(group.key, "after");
+                      }}
+                      onDrop={(event) => {
+                        if (
+                          !draggedProjectKey ||
+                          draggedProjectKey === group.key
+                        ) {
+                          return;
+                        }
+                        event.preventDefault();
+                        dropProject(group.key, "after");
+                      }}
                     >
                       {snapshot.preferences.groupTrackedByProject && (
                         <ProjectGroupHeader
                           group={group}
                           count={group.sessions.length}
+                          totalCount={
+                            allProjectGroups.find(
+                              (item) => item.key === group.key
+                            )?.sessions.length ?? group.sessions.length
+                          }
                           language={snapshot.preferences.language}
                           draggable={allProjectGroups.length > 1}
                           dragging={draggedProjectKey === group.key}
-                          dropTarget={
+                          dropPosition={
                             draggedProjectKey !== null &&
                             projectDropTargetKey === group.key
+                              ? projectDropPosition
+                              : null
                           }
                           onUpdate={updateProjectGroup}
-                          onPointerStart={startProjectDrag}
-                          onPointerHover={hoverProjectDrag}
-                          onPointerDrop={dropProject}
-                          onPointerCancel={() => {
-                            draggedProjectKeyRef.current = null;
-                            hoveredProjectKeyRef.current = null;
-                            setDraggedProjectKey(null);
-                            setProjectDropTargetKey(null);
-                          }}
+                          onDragStart={startProjectDrag}
+                          onDragHover={hoverProjectDrag}
+                          onDragDrop={dropProject}
+                          onMove={moveProject}
+                          onArchiveAll={requestArchiveProjectGroup}
+                          onDragCancel={cancelProjectDrag}
                         />
                       )}
                       {!group.collapsed && (
@@ -991,6 +1237,19 @@ export default function App() {
         open={mobileDevicesOpen}
         language={snapshot.preferences.language}
         onClose={() => setMobileDevicesOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmation !== null}
+        title={confirmation?.title ?? ""}
+        description={confirmation?.description ?? ""}
+        confirmLabel={confirmation?.confirmLabel ?? copy.common.delete}
+        cancelLabel={copy.common.cancel}
+        busy={confirmationBusy}
+        onCancel={() => {
+          if (!confirmationBusy) setConfirmation(null);
+        }}
+        onConfirm={() => void confirmPendingAction()}
       />
 
       {promptedSession && (

@@ -31,5 +31,8 @@ describe("CompactDashboard controls", () => {
     expect(markup).not.toContain('aria-label="Wyjście"');
     expect(markup).not.toContain("app-titlebar");
     expect(markup).not.toContain("app-menu");
+    expect(markup.indexOf("lucide-arrow-left")).toBeLessThan(
+      markup.indexOf("lucide-sun")
+    );
   });
 });

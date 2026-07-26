@@ -17,6 +17,7 @@ export interface ProjectGroupPresentation {
   symbol: string;
   color: string;
   collapsed: boolean;
+  sidebarCollapsed: boolean;
   order: number;
 }
 
@@ -38,6 +39,7 @@ export function groupSessionsByProject<T extends { projectName: string }>(
         symbol: "A",
         color: PROJECT_COLORS[0],
         collapsed: false,
+        sidebarCollapsed: false,
         order: 0,
         sessions
       }
@@ -76,6 +78,7 @@ export function resolveProjectGroup(
         ? config.color
         : defaultProjectColor(projectKey || fallbackName),
     collapsed: config?.collapsed === true,
+    sidebarCollapsed: config?.sidebarCollapsed === true,
     order:
       typeof config?.order === "number" && Number.isFinite(config.order)
         ? config.order
@@ -116,6 +119,9 @@ export function normalizeProjectGroupConfigs(
       ...(symbol ? { symbol } : {}),
       ...(color ? { color } : {}),
       ...(candidate.collapsed === true ? { collapsed: true } : {}),
+      ...(candidate.sidebarCollapsed === true
+        ? { sidebarCollapsed: true }
+        : {}),
       order:
         typeof candidate.order === "number" &&
         Number.isFinite(candidate.order)
@@ -124,6 +130,38 @@ export function normalizeProjectGroupConfigs(
     });
   }
   return [...normalized.values()].sort((left, right) => left.order - right.order);
+}
+
+export function setProjectGroupsCollapsed(
+  configs: ProjectGroupConfig[],
+  projectKeys: string[],
+  collapsed: boolean
+): ProjectGroupConfig[] {
+  const uniqueKeys = [...new Set(projectKeys)];
+  const keySet = new Set(uniqueKeys);
+  const existing = new Map(
+    configs.map((group) => [group.projectKey, group])
+  );
+  const maxOrder = configs.reduce(
+    (highest, group) => Math.max(highest, group.order),
+    -1
+  );
+  const updated = uniqueKeys.map((projectKey, index) => {
+    const group: ProjectGroupConfig = {
+      ...(existing.get(projectKey) ?? {
+        projectKey,
+        order: maxOrder + index + 1
+      })
+    };
+    if (collapsed) group.collapsed = true;
+    else delete group.collapsed;
+    return group;
+  });
+
+  return normalizeProjectGroupConfigs([
+    ...configs.filter((group) => !keySet.has(group.projectKey)),
+    ...updated
+  ]);
 }
 
 export function defaultProjectColor(projectKey: string): string {

@@ -1,18 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { agentApi } from "../lib/api";
 import { copyFor } from "../lib/i18n";
+import { COMPACT_MODE_SHORTCUT } from "../shared/shortcuts";
 import type { AppLanguage } from "../shared/types";
 
 interface AppTitleBarProps {
   language: AppLanguage;
   onToggleCompact(): void;
+  onOpenSettings(): void;
 }
 
 type OpenMenu = "file" | "view" | null;
 
 export function AppTitleBar({
   language,
-  onToggleCompact
+  onToggleCompact,
+  onOpenSettings
 }: AppTitleBarProps) {
   const copy = copyFor(language);
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
@@ -74,6 +77,17 @@ export function AppTitleBar({
                 role="menuitem"
                 onClick={() => {
                   setOpenMenu(null);
+                  onOpenSettings();
+                }}
+              >
+                <span>{copy.titlebar.options}</span>
+              </button>
+              <button
+                className="app-menu__separator-before"
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpenMenu(null);
                   void agentApi.exitApp();
                 }}
               >
@@ -108,6 +122,7 @@ export function AppTitleBar({
                 }}
               >
                 <span>{copy.titlebar.compactView}</span>
+                <kbd>{COMPACT_MODE_SHORTCUT}</kbd>
               </button>
             </div>
           )}

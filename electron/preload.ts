@@ -4,6 +4,7 @@ import type {
   AppPreferences,
   AppSnapshot,
   ReorderProjectGroupsInput,
+  SetProjectGroupsCollapsedInput,
   TrackSessionsInput,
   UpdateProjectGroupInput,
   UpdateTrackedSessionInput
@@ -15,10 +16,14 @@ const api: AgentSignalApi = {
     ipcRenderer.invoke("sessions:track", input),
   archiveSession: (sessionId: string) =>
     ipcRenderer.invoke("sessions:archive", sessionId),
+  archiveSessions: (input: TrackSessionsInput) =>
+    ipcRenderer.invoke("sessions:archive-many", input),
   restoreArchivedSession: (sessionId: string) =>
     ipcRenderer.invoke("sessions:restore", sessionId),
   deleteArchivedSession: (sessionId: string) =>
     ipcRenderer.invoke("sessions:delete-archived", sessionId),
+  deleteArchivedSessions: (input: TrackSessionsInput) =>
+    ipcRenderer.invoke("sessions:delete-archived-many", input),
   updateTrackedSession: (input: UpdateTrackedSessionInput) =>
     ipcRenderer.invoke("sessions:update", input),
   updatePreferences: (patch: Partial<AppPreferences>) =>
@@ -27,6 +32,8 @@ const api: AgentSignalApi = {
     ipcRenderer.invoke("project-groups:update", input),
   reorderProjectGroups: (input: ReorderProjectGroupsInput) =>
     ipcRenderer.invoke("project-groups:reorder", input),
+  setProjectGroupsCollapsed: (input: SetProjectGroupsCollapsedInput) =>
+    ipcRenderer.invoke("project-groups:set-collapsed", input),
   dismissSessionPrompt: (sessionId: string) =>
     ipcRenderer.invoke("sessions:dismiss-prompt", sessionId),
   openSession: (sessionId: string) =>

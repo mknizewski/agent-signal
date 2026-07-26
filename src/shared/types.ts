@@ -78,6 +78,7 @@ export interface ProjectGroupConfig {
   symbol?: string;
   color?: string;
   collapsed?: boolean;
+  sidebarCollapsed?: boolean;
   order: number;
 }
 
@@ -135,10 +136,16 @@ export interface UpdateProjectGroupInput {
   symbol?: string;
   color?: string;
   collapsed?: boolean;
+  sidebarCollapsed?: boolean;
 }
 
 export interface ReorderProjectGroupsInput {
   projectKeys: string[];
+}
+
+export interface SetProjectGroupsCollapsedInput {
+  projectKeys: string[];
+  collapsed: boolean;
 }
 
 export interface MobileSessionSummary {
@@ -196,8 +203,10 @@ export interface AgentSignalApi {
   getSnapshot(): Promise<AppSnapshot>;
   trackSessions(input: TrackSessionsInput): Promise<AppSnapshot>;
   archiveSession(sessionId: string): Promise<AppSnapshot>;
+  archiveSessions(input: TrackSessionsInput): Promise<AppSnapshot>;
   restoreArchivedSession(sessionId: string): Promise<AppSnapshot>;
   deleteArchivedSession(sessionId: string): Promise<AppSnapshot>;
+  deleteArchivedSessions(input: TrackSessionsInput): Promise<AppSnapshot>;
   updateTrackedSession(input: UpdateTrackedSessionInput): Promise<AppSnapshot>;
   updatePreferences(
     patch: Partial<AppPreferences>
@@ -205,6 +214,9 @@ export interface AgentSignalApi {
   updateProjectGroup(input: UpdateProjectGroupInput): Promise<AppSnapshot>;
   reorderProjectGroups(
     input: ReorderProjectGroupsInput
+  ): Promise<AppSnapshot>;
+  setProjectGroupsCollapsed(
+    input: SetProjectGroupsCollapsedInput
   ): Promise<AppSnapshot>;
   dismissSessionPrompt(sessionId: string): Promise<AppSnapshot>;
   openSession(sessionId: string): Promise<void>;

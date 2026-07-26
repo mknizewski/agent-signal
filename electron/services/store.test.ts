@@ -69,6 +69,7 @@ describe("TrackingStore", () => {
           symbol: "P",
           color: "#6f82e8",
           collapsed: true,
+          sidebarCollapsed: true,
           order: 0
         }
       ]
@@ -92,6 +93,7 @@ describe("TrackingStore", () => {
           symbol: "P",
           color: "#6f82e8",
           collapsed: true,
+          sidebarCollapsed: true,
           order: 0
         }
       ]

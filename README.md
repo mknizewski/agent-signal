@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.6.1" src="https://img.shields.io/badge/version-0.6.1-e85d6a" />
+  <img alt="Version 0.6.2" src="https://img.shields.io/badge/version-0.6.2-e85d6a" />
   <img alt="Windows 10 and 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-2563eb" />
   <img alt="Polish and English" src="https://img.shields.io/badge/UI-Polski%20%7C%20English-7b6fe5" />
   <img alt="MIT License" src="https://img.shields.io/badge/license-MIT-3db47a" />
@@ -28,7 +28,23 @@ answers approval requests, or deletes the source conversation.
 > Every screenshot in this README uses built-in demonstration data. No real
 > conversation, account, or local project path is shown.
 
-## What is new in 0.6.1
+## What is new in 0.6.2
+
+Version 0.6.2 focuses on clarity and lighter interaction:
+
+- parent pets always use the standard chat animations, including when subagents
+  are present;
+- subagents are presented as detected team members without unreliable live
+  status labels, colors, or completion claims;
+- all scrollbars use a slimmer, lower-contrast treatment;
+- compact-mode return and theme controls follow a more natural order;
+- the application and installer return to the three-light signal icon;
+- project drag-and-drop has a larger handle, clear before/after insertion
+  markers, a native drag preview, and keyboard reordering with arrow keys;
+- the collapsed sidebar temporarily opens after a short hover delay and remains
+  open while focus stays inside it.
+
+## What was new in 0.6.1
 
 Version 0.6.1 turns the flat watch list into a configurable project workspace:
 
@@ -44,15 +60,14 @@ Version 0.6.1 turns the flat watch list into a configurable project workspace:
   notifications, language, and pet behavior;
 - naturally written Polish and English interface copy;
 - sleeping pets after a configurable idle period, set to 15 minutes by default;
-- a live Codex subagent team panel with mini-pets, roles, statuses, direct child
-  chat navigation, and a playful manager animation for the parent pet;
+- a Codex subagent team panel with mini-pets, roles, and direct child chat
+  navigation;
 - a corrected approval state that requires an explicit approval or input signal;
 - a 10-second grace period and optional muting for approval-wait notifications,
   without delaying or hiding the dashboard status;
 - larger, higher-contrast UI text, including the mobile-device dialog;
 - a refined Codex pet and hammer animation with no clipped swing;
-- a new application icon based on the laptop-working robot from the promotional
-  artwork;
+- a refreshed application identity and promotional artwork;
 - a dark, bilingual Windows installer with signal-light accents, a robot
   sidebar, a selectable destination folder, and the correctly separated
   **Agent Signal** product name;
@@ -104,21 +119,18 @@ The collapsible team panel shows a mini-pet, nickname or task name, role, and
 current runtime state for every child. Select a child to open that exact Codex
 thread.
 
-The parent pet switches into a light-hearted manager animation while it has a
-team. Compact mode keeps the manager cue and adds the active/total subagent
-count to the Codex summary. The whole feature can be disabled in Settings.
+Subagents use one neutral presence animation and do not expose a live status.
+The parent pet keeps the same working, approval, idle, and sleep behavior as a
+chat without subagents. Compact mode reports only how many subagents were
+detected. The whole feature can be disabled in Settings.
 
 ![Codex parent chat with a collapsible team of animated subagents](docs/screenshots/subagent-team-0.6.1.png)
 
 Subagent relationships come from the explicit `subAgentThreadSpawn` metadata
 reported by the local Codex App Server. Agent Signal does not guess a parent
-from titles, paths, or timing. Live state comes from each parent thread's
-official `collabAgentToolCall.agentsStates` map and turn lifecycle. Current
-Codex builds may persist only `subAgentActivity` items after a turn finishes,
-so the terminal parent-turn state is used as a safe fallback. `running` and
-`pendingInit` remain working, while only a confirmed terminal state becomes
-completed. A technical `notLoaded` thread state is treated as unknown, never
-as proof that the subagent finished.
+from titles, paths, or timing. Because child lifecycle data can be incomplete,
+the dashboard intentionally treats the child list as presence information
+rather than a reliable live-status feed.
 
 ## Status model
 
@@ -158,7 +170,7 @@ Compact mode removes the full dashboard's separate title and menu bar. Its
 brand and controls share the native window-control row, leaving more room for
 the signals. A return arrow beside the light/dark theme control restores the
 full dashboard in one click. The two provider pets use a separate, restrained
-set of compact-only monitoring, alert, supervisor, and sleep animations instead
+set of compact-only monitoring, alert, and sleep animations instead
 of inheriting the dashboard's tools and gestures.
 
 ![Agent Signal compact mode without a separate menu bar](docs/screenshots/compact-dark-0.6.1-no-menu.jpg)
@@ -168,9 +180,9 @@ of inheriting the dashboard's tools and gestures.
 Codex and Claude Code have distinct animated status pets. A working pet
 animates, an approval state asks for attention, and an idle pet can fall asleep
 with a small `zzz` animation. The sleep threshold is configurable from 1 to 120
-minutes and defaults to 15 minutes. A Codex parent with subagents becomes a
-playful manager with a tie, clipboard, and pointing gesture while its mini-pets
-work underneath.
+minutes and defaults to 15 minutes. A Codex parent with subagents keeps the same
+animation rules as every other chat, while the mini-pets below use a neutral
+presence animation.
 
 ## Preferences and languages
 
@@ -183,7 +195,7 @@ The Settings view saves changes automatically. Available controls include:
 - new-session listening and the watch prompt;
 - system notifications;
 - separate approval-wait alerts for desktop and mobile;
-- Codex subagent team panels and the parent manager animation;
+- Codex subagent team panels;
 - sleeping-pet animation and its idle threshold.
 
 ## Mobile dashboard
@@ -243,7 +255,7 @@ written naturally for each language.
 </p>
 
 The product name is displayed as **Agent Signal** throughout the installer,
-Start menu, desktop shortcut, and installed-app list. Version 0.6.1 targets
+Start menu, desktop shortcut, and installed-app list. Version 0.6.2 targets
 Windows 10 and Windows 11 on x64 and works with Codex, Claude Code, or both.
 
 ### Run from source

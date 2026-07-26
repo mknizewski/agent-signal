@@ -5,6 +5,7 @@ const translations = {
     common: {
       close: "Zamknij",
       cancel: "Anuluj",
+      delete: "Usuń",
       codex: "Codex",
       claude: "Claude Code",
       noProject: "Bez projektu"
@@ -56,14 +57,23 @@ const translations = {
       archiveSuccess: "Czat przeniesiono do archiwum.",
       restoreSuccess: "Czat przywrócono do obserwowanych.",
       deleteSuccess: "Wpis usunięto z archiwum.",
-      archiveDeleteConfirm: (title: string) =>
-        `Usunąć „${title}” z archiwum Agent Signal?\n\nOryginalna rozmowa w Codex lub Claude Code pozostanie bez zmian.`,
+      archiveDeleteTitle: "Usunąć wpis z archiwum?",
+      archiveDeleteDescription: (title: string) =>
+        `Wpis „${title}” zniknie z Agent Signal. Oryginalna rozmowa w Codex lub Claude Code pozostanie bez zmian.`,
+      deleteAllArchive: "Wyczyść archiwum",
+      deleteAllArchiveTitle: "Wyczyścić całe archiwum?",
+      deleteAllArchiveDescription: (count: number) =>
+        `Usuniesz ${count} ${count === 1 ? "wpis" : "wpisów"} z archiwum Agent Signal. Oryginalne rozmowy pozostaną bez zmian.`,
+      deleteAllArchiveSuccess: (count: number) =>
+        `Usunięto z archiwum: ${count}.`,
       watchedSection: "Obserwowane czaty",
       collapseWatched: "Zwiń obserwowane",
       expandWatched: "Rozwiń obserwowane",
       collapseSidebar: "Zwiń menu boczne",
       expandSidebar: "Rozwiń menu boczne",
-      noWatched: "Brak obserwowanych czatów"
+      noWatched: "Brak obserwowanych czatów",
+      collapseAllGroups: "Zwiń wszystkie grupy",
+      expandAllGroups: "Rozwiń wszystkie grupy"
     },
     picker: {
       title: "Dodaj czaty",
@@ -89,21 +99,14 @@ const translations = {
     },
     subagents: {
       title: "Zespół subagentów",
-      manager: "Manager zespołu",
       collapse: "Zwiń zespół",
       expand: "Rozwiń zespół",
-      summary: (working: number, total: number) =>
-        working > 0
-          ? `${working} ${working === 1 ? "pracuje" : "pracują"} · ${total} razem`
-          : `${total} ${total === 1 ? "ukończony" : "ukończone"}`,
+      summary: (total: number) =>
+        `${total} ${total === 1 ? "wykryty subagent" : "wykrytych subagentów"}`,
+      presence: "Wykryty subagent",
       open: "Otwórz subagenta",
       more: (count: number) => `+${count} więcej`,
-      roleFallback: "Zadanie pomocnicze",
-      working: "Pracuje",
-      attention: "Czeka na decyzję",
-      idle: "Ukończony",
-      error: "Błąd",
-      unavailable: "Stan nieznany"
+      roleFallback: "Zadanie pomocnicze"
     },
     groups: {
       edit: "Edytuj grupę",
@@ -116,7 +119,13 @@ const translations = {
       symbolPlaceholder: "Np. P",
       color: "Kolor",
       save: "Zapisz",
-      reset: "Użyj automatycznych"
+      reset: "Użyj automatycznych",
+      archiveAll: "Usuń wszystkie czaty z grupy",
+      archiveAllTitle: (name: string) => `Usunąć czaty z grupy „${name}”?`,
+      archiveAllDescription: (count: number) =>
+        `${count} ${count === 1 ? "czat trafi" : "czatów trafi"} do archiwum Agent Signal. Oryginalne rozmowy pozostaną bez zmian.`,
+      archiveAllSuccess: (count: number) =>
+        `Przeniesiono do archiwum: ${count}.`
     },
     prompt: {
       eyebrow: "Nowy czat",
@@ -170,7 +179,7 @@ const translations = {
         "Pupil zasypia, gdy sesja pozostaje bezczynna przez określony czas.",
       subagentTeams: "Pokazuj zespoły subagentów",
       subagentTeamsDescription:
-        "Wyświetla mini-pupile subagentów i animację managera przy głównym czacie.",
+        "Pokazuje wykrytych subagentów bez zgadywania ich bieżącego statusu.",
       idleAfter: "Uśpij po",
       minutes: "min",
       saved: "Preferencje zapisują się automatycznie."
@@ -208,6 +217,7 @@ const translations = {
     titlebar: {
       file: "Plik",
       view: "Widok",
+      options: "Opcje",
       exit: "Wyjście",
       fullView: "Pełny widok",
       compactView: "Tryb kompaktowy"
@@ -254,6 +264,7 @@ const translations = {
     common: {
       close: "Close",
       cancel: "Cancel",
+      delete: "Delete",
       codex: "Codex",
       claude: "Claude Code",
       noProject: "No project"
@@ -305,14 +316,23 @@ const translations = {
       archiveSuccess: "Chat moved to the archive.",
       restoreSuccess: "Chat restored to your watch list.",
       deleteSuccess: "Archive entry removed.",
-      archiveDeleteConfirm: (title: string) =>
-        `Remove “${title}” from the Agent Signal archive?\n\nThe original conversation in Codex or Claude Code will not be changed.`,
+      archiveDeleteTitle: "Remove this archive entry?",
+      archiveDeleteDescription: (title: string) =>
+        `“${title}” will be removed from Agent Signal. The original conversation in Codex or Claude Code will not be changed.`,
+      deleteAllArchive: "Clear archive",
+      deleteAllArchiveTitle: "Clear the entire archive?",
+      deleteAllArchiveDescription: (count: number) =>
+        `${count} ${count === 1 ? "entry" : "entries"} will be removed from the Agent Signal archive. The original conversations will not be changed.`,
+      deleteAllArchiveSuccess: (count: number) =>
+        `${count} ${count === 1 ? "entry" : "entries"} removed from the archive.`,
       watchedSection: "Watched chats",
       collapseWatched: "Collapse watched chats",
       expandWatched: "Expand watched chats",
       collapseSidebar: "Collapse sidebar",
       expandSidebar: "Expand sidebar",
-      noWatched: "No watched chats"
+      noWatched: "No watched chats",
+      collapseAllGroups: "Collapse all groups",
+      expandAllGroups: "Expand all groups"
     },
     picker: {
       title: "Add chats",
@@ -338,21 +358,14 @@ const translations = {
     },
     subagents: {
       title: "Subagent team",
-      manager: "Team manager",
       collapse: "Collapse team",
       expand: "Expand team",
-      summary: (working: number, total: number) =>
-        working > 0
-          ? `${working} working · ${total} total`
-          : `${total} completed`,
+      summary: (total: number) =>
+        `${total} detected ${total === 1 ? "subagent" : "subagents"}`,
+      presence: "Detected subagent",
       open: "Open subagent",
       more: (count: number) => `+${count} more`,
-      roleFallback: "Supporting task",
-      working: "Working",
-      attention: "Waiting for input",
-      idle: "Completed",
-      error: "Error",
-      unavailable: "Status unknown"
+      roleFallback: "Supporting task"
     },
     groups: {
       edit: "Edit group",
@@ -365,7 +378,13 @@ const translations = {
       symbolPlaceholder: "For example, P",
       color: "Color",
       save: "Save",
-      reset: "Use automatic values"
+      reset: "Use automatic values",
+      archiveAll: "Remove all chats from group",
+      archiveAllTitle: (name: string) => `Remove chats from “${name}”?`,
+      archiveAllDescription: (count: number) =>
+        `${count} ${count === 1 ? "chat" : "chats"} will move to the Agent Signal archive. The original conversations will not be changed.`,
+      archiveAllSuccess: (count: number) =>
+        `${count} ${count === 1 ? "chat" : "chats"} moved to the archive.`
     },
     prompt: {
       eyebrow: "New chat",
@@ -419,7 +438,7 @@ const translations = {
         "A pet falls asleep after its session has been idle for a while.",
       subagentTeams: "Show subagent teams",
       subagentTeamsDescription:
-        "Shows subagent mini-pets and a manager animation on the parent chat.",
+        "Shows detected subagents without guessing their current status.",
       idleAfter: "Sleep after",
       minutes: "min",
       saved: "Preferences are saved automatically."
@@ -453,6 +472,7 @@ const translations = {
     titlebar: {
       file: "File",
       view: "View",
+      options: "Options",
       exit: "Exit",
       fullView: "Full dashboard",
       compactView: "Compact mode"

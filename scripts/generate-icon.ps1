@@ -2,18 +2,43 @@ Add-Type -AssemblyName System.Drawing
 
 $projectDirectory = Split-Path -Parent $PSScriptRoot
 $buildDirectory = Join-Path $projectDirectory "build"
-$masterPath = Join-Path $buildDirectory "icon-master.png"
+$vectorPath = Join-Path $buildDirectory "icon.svg"
 $pngPath = Join-Path $buildDirectory "icon.png"
 $icoPath = Join-Path $buildDirectory "icon.ico"
 $iconSizes = @(16, 20, 24, 32, 40, 48, 64, 128, 256)
 
-if (-not (Test-Path -LiteralPath $masterPath)) {
-  throw "Nie znaleziono pliku zrodlowego ikony: $masterPath"
+if (-not (Test-Path -LiteralPath $vectorPath)) {
+  throw "Nie znaleziono pliku zrodlowego ikony: $vectorPath"
+}
+
+function New-RoundedRectanglePath {
+  param(
+    [float]$X,
+    [float]$Y,
+    [float]$Width,
+    [float]$Height,
+    [float]$Radius
+  )
+
+  $diameter = $Radius * 2
+  $path = [System.Drawing.Drawing2D.GraphicsPath]::new()
+  $path.AddArc($X, $Y, $diameter, $diameter, 180, 90)
+  $path.AddArc($X + $Width - $diameter, $Y, $diameter, $diameter, 270, 90)
+  $path.AddArc(
+    $X + $Width - $diameter,
+    $Y + $Height - $diameter,
+    $diameter,
+    $diameter,
+    0,
+    90
+  )
+  $path.AddArc($X, $Y + $Height - $diameter, $diameter, $diameter, 90, 90)
+  $path.CloseFigure()
+  return $path
 }
 
 function New-ResizedIcon {
   param(
-    [System.Drawing.Image]$Source,
     [int]$Size
   )
 
@@ -25,8 +50,6 @@ function New-ResizedIcon {
   $bitmap.SetResolution(96, 96)
   $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
   $graphics.Clear([System.Drawing.Color]::Transparent)
-  $graphics.CompositingMode =
-    [System.Drawing.Drawing2D.CompositingMode]::SourceCopy
   $graphics.CompositingQuality =
     [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
   $graphics.InterpolationMode =
@@ -35,19 +58,61 @@ function New-ResizedIcon {
     [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
   $graphics.SmoothingMode =
     [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
-  $graphics.DrawImage($Source, 0, 0, $Size, $Size)
+  $scale = $Size / 256.0
+  $graphics.ScaleTransform($scale, $scale)
+
+  $outerPath = New-RoundedRectanglePath 16 16 224 224 58
+  $outerBrush = [System.Drawing.SolidBrush]::new(
+    [System.Drawing.ColorTranslator]::FromHtml("#20201e")
+  )
+  $graphics.FillPath($outerBrush, $outerPath)
+
+  $signalPath = New-RoundedRectanglePath 37 82 182 92 46
+  $signalBrush = [System.Drawing.SolidBrush]::new(
+    [System.Drawing.ColorTranslator]::FromHtml("#131312")
+  )
+  $signalPen = [System.Drawing.Pen]::new(
+    [System.Drawing.ColorTranslator]::FromHtml("#4a4a45"),
+    7
+  )
+  $graphics.FillPath($signalBrush, $signalPath)
+  $graphics.DrawPath($signalPen, $signalPath)
+
+  $lights = @(
+    @{ X = 58; Color = "#ed5a5f"; Highlight = 68 },
+    @{ X = 108; Color = "#e4a62b"; Highlight = 118 },
+    @{ X = 158; Color = "#3db47a"; Highlight = 168 }
+  )
+  foreach ($light in $lights) {
+    $brush = [System.Drawing.SolidBrush]::new(
+      [System.Drawing.ColorTranslator]::FromHtml($light.Color)
+    )
+    $graphics.FillEllipse($brush, $light.X, 108, 40, 40)
+    $brush.Dispose()
+
+    $highlightBrush = [System.Drawing.SolidBrush]::new(
+      [System.Drawing.Color]::FromArgb(82, 255, 255, 255)
+    )
+    $graphics.FillEllipse($highlightBrush, $light.Highlight, 116, 10, 10)
+    $highlightBrush.Dispose()
+  }
+
+  $signalPen.Dispose()
+  $signalBrush.Dispose()
+  $signalPath.Dispose()
+  $outerBrush.Dispose()
+  $outerPath.Dispose()
   $graphics.Dispose()
   return $bitmap
 }
 
-$source = [System.Drawing.Image]::FromFile($masterPath)
-$preview = New-ResizedIcon -Source $source -Size 512
+$preview = New-ResizedIcon -Size 512
 $preview.Save($pngPath, [System.Drawing.Imaging.ImageFormat]::Png)
 $preview.Dispose()
 
 $frames = @()
 foreach ($size in $iconSizes) {
-  $bitmap = New-ResizedIcon -Source $source -Size $size
+  $bitmap = New-ResizedIcon -Size $size
   $stream = [System.IO.MemoryStream]::new()
   $bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)
   $frames += [PSCustomObject]@{
@@ -57,7 +122,6 @@ foreach ($size in $iconSizes) {
   $stream.Dispose()
   $bitmap.Dispose()
 }
-$source.Dispose()
 
 $fileStream = [System.IO.File]::Create($icoPath)
 $writer = [System.IO.BinaryWriter]::new($fileStream)

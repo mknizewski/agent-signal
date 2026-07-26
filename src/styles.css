@@ -26,6 +26,41 @@
 
 * {
   box-sizing: border-box;
+  scrollbar-color:
+    color-mix(in srgb, var(--subtle) 42%, transparent)
+    transparent;
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-button,
+*::-webkit-scrollbar-button:single-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background:
+    color-mix(in srgb, var(--subtle) 38%, transparent)
+    content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background:
+    color-mix(in srgb, var(--muted) 58%, transparent)
+    content-box;
 }
 
 html,
@@ -162,6 +197,12 @@ body {
   background: var(--sidebar-hover);
 }
 
+.app-menu__popover .app-menu__separator-before {
+  margin-top: 4px;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 5px 5px;
+}
+
 .app-menu__popover kbd {
   color: var(--subtle);
   font-family: inherit;
@@ -191,11 +232,15 @@ input:focus-visible {
 
 .sidebar {
   display: flex;
+  width: 100%;
   min-width: 0;
   flex-direction: column;
   padding: 16px 12px 14px;
   border-right: 1px solid var(--line);
   background: var(--sidebar);
+  transition:
+    width 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .brand {
@@ -542,6 +587,26 @@ input:focus-visible {
   background: #f5f5f2;
 }
 
+.button--danger {
+  border: 1px solid color-mix(in srgb, #c8463d 42%, var(--line));
+  color: #a52d27;
+  background: color-mix(in srgb, #c8463d 7%, var(--surface));
+}
+
+.button--danger:hover:not(:disabled) {
+  border-color: color-mix(in srgb, #c8463d 65%, var(--line));
+  background: color-mix(in srgb, #c8463d 13%, var(--surface));
+}
+
+.button--danger-solid {
+  color: #fff;
+  background: #c74640;
+}
+
+.button--danger-solid:hover:not(:disabled) {
+  background: #b63a35;
+}
+
 .icon-button {
   width: 34px;
   height: 34px;
@@ -603,15 +668,39 @@ input:focus-visible {
 }
 
 .list-toolbar--archive {
+  justify-content: flex-start;
   margin-top: 34px;
   padding-top: 20px;
   border-top: 1px solid var(--line);
+}
+
+.list-toolbar--archive > span {
+  margin-left: auto;
+}
+
+.archive-clear-button {
+  min-height: 36px;
+  white-space: nowrap;
 }
 
 .list-toolbar > span {
   flex: 0 0 auto;
   color: #92928d;
   font-size: 10px;
+}
+
+.group-visibility-actions {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.group-visibility-actions .button {
+  min-height: 34px;
+  padding: 0 10px;
+  white-space: nowrap;
 }
 
 .search-input {
@@ -1355,6 +1444,88 @@ input:focus-visible {
   place-items: center;
   background: rgba(30, 30, 28, 0.28);
   backdrop-filter: blur(2px);
+}
+
+.confirm-dialog-backdrop {
+  z-index: 90;
+  background: rgba(14, 14, 13, 0.5);
+  backdrop-filter: blur(5px);
+}
+
+.confirm-dialog {
+  width: min(440px, 100%);
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: 0 26px 80px rgba(12, 12, 11, 0.3);
+  animation: confirm-dialog-enter 150ms ease-out both;
+}
+
+.confirm-dialog__header {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 12px;
+  padding: 17px 18px 13px;
+}
+
+.confirm-dialog__icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, #d2524b 35%, var(--line));
+  border-radius: 10px;
+  color: #d65f58;
+  background: color-mix(in srgb, #d2524b 10%, var(--surface));
+}
+
+.confirm-dialog__header small {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--subtle);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.confirm-dialog__header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.confirm-dialog > p {
+  margin: 0;
+  padding: 2px 20px 18px 68px;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.confirm-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px 16px;
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--canvas) 55%, var(--surface));
+}
+
+@keyframes confirm-dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(7px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .chat-picker {
@@ -2145,6 +2316,24 @@ input:focus-visible {
   background: #2d2d2a;
 }
 
+[data-theme="dark"] .button--danger {
+  color: #f18f88;
+  background: color-mix(in srgb, #d9544b 10%, var(--surface));
+}
+
+[data-theme="dark"] .button--danger:hover:not(:disabled) {
+  background: color-mix(in srgb, #d9544b 18%, var(--surface));
+}
+
+[data-theme="dark"] .button--danger-solid {
+  color: #fff;
+  background: #c94d47;
+}
+
+[data-theme="dark"] .button--danger-solid:hover:not(:disabled) {
+  background: #dc5a53;
+}
+
 [data-theme="dark"] .icon-button {
   color: #aaa9a3;
 }
@@ -2850,7 +3039,7 @@ html[data-compact="true"] body {
 
 /*
  * Compact pets have a dedicated motion language. They intentionally do not
- * inherit the dashboard's tool carousel, waving, or manager accessories.
+ * inherit the dashboard's tool carousel or waving.
  */
 .status-pet--compact-motion .status-pet__body {
   animation: compact-pet-ready 4.2s ease-in-out infinite;
@@ -2870,10 +3059,6 @@ html[data-compact="true"] body {
 
 .status-pet--compact-motion.status-pet--attention .status-pet__signal {
   animation: compact-pet-signal 1.25s ease-in-out infinite;
-}
-
-.status-pet--compact-motion.status-pet--manager .status-pet__body {
-  animation: compact-pet-supervise 2.7s ease-in-out infinite;
 }
 
 .status-pet--compact-motion.status-pet--sleeping .status-pet__body {
@@ -2931,21 +3116,6 @@ html[data-compact="true"] body {
 
   42% {
     transform: translateY(-1px) scale(1.01);
-  }
-}
-
-@keyframes compact-pet-supervise {
-  0%,
-  100% {
-    transform: translateX(0) rotate(-1deg);
-  }
-
-  38% {
-    transform: translateX(1px) rotate(2deg);
-  }
-
-  72% {
-    transform: translateX(-1px) rotate(0);
   }
 }
 
@@ -3072,9 +3242,27 @@ html[data-compact="true"] body {
   transform: scale(0.995);
 }
 
-.project-group__header.is-drop-target:not(.is-dragging) {
-  background: color-mix(in srgb, var(--project-color) 9%, transparent);
-  box-shadow: inset 3px 0 var(--project-color);
+.project-group__header.is-drop-before::before,
+.project-group__header.is-drop-after::after {
+  position: absolute;
+  z-index: 4;
+  right: 5px;
+  left: 5px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--project-color);
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--project-color) 12%, transparent);
+  content: "";
+  pointer-events: none;
+}
+
+.project-group__header.is-drop-before::before {
+  top: -4px;
+}
+
+.project-group__header.is-drop-after::after {
+  bottom: -4px;
 }
 
 .project-group__header.is-editing {
@@ -3090,23 +3278,34 @@ html[data-compact="true"] body {
 
 .project-group__drag {
   display: grid;
-  width: 18px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   flex: 0 0 auto;
   place-items: center;
+  border: 1px solid transparent;
+  border-radius: 7px;
   color: var(--subtle);
+  background: transparent;
   cursor: grab;
-  opacity: 0.62;
+  opacity: 0.8;
   touch-action: none;
   user-select: none;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease,
+    background 120ms ease,
+    opacity 120ms ease;
 }
 
 .project-group__drag:active {
   cursor: grabbing;
 }
 
-.project-group__header:hover .project-group__drag {
-  color: var(--muted);
+.project-group__header:hover .project-group__drag,
+.project-group__drag:focus-visible {
+  border-color: var(--line);
+  color: var(--text);
+  background: var(--surface);
   opacity: 1;
 }
 
@@ -3117,7 +3316,8 @@ html[data-compact="true"] body {
   font-size: 11px;
 }
 
-.project-group__edit {
+.project-group__edit,
+.project-group__delete {
   display: grid;
   width: 25px;
   height: 25px;
@@ -3134,15 +3334,28 @@ html[data-compact="true"] body {
 }
 
 .project-group__header:hover .project-group__edit,
+.project-group__header:hover .project-group__delete,
 .project-group__edit:focus-visible,
-.project-group__header.is-editing .project-group__edit {
+.project-group__delete:focus-visible,
+.project-group__header.is-editing .project-group__edit,
+.project-group__header.is-editing .project-group__delete {
   opacity: 1;
 }
 
-.project-group__edit:hover {
+.project-group__edit:hover,
+.project-group__delete:hover:not(:disabled) {
   color: var(--text);
   background: var(--surface);
   box-shadow: 0 1px 3px rgba(20, 20, 18, 0.08);
+}
+
+.project-group__delete:disabled {
+  cursor: not-allowed;
+  opacity: 0.25;
+}
+
+.project-group__delete:hover:not(:disabled) {
+  color: #d45b53;
 }
 
 .project-group__count {
@@ -3220,6 +3433,7 @@ html[data-compact="true"] body {
   grid-column: 1 / -1;
   align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 7px;
   padding-top: 2px;
 }
@@ -3228,15 +3442,26 @@ html[data-compact="true"] body {
   margin-right: auto;
 }
 
-.sidebar-watched__group > small {
+.sidebar-watched__group-toggle {
   display: flex;
+  width: 100%;
   align-items: center;
   gap: 6px;
+  padding: 5px 7px 2px;
+  border-radius: 6px;
   color: var(--muted);
+  background: transparent;
+  cursor: pointer;
   font-size: 9.5px;
+  text-align: left;
 }
 
-.sidebar-watched__group > small > i {
+.sidebar-watched__group-toggle:hover {
+  color: var(--text);
+  background: rgba(128, 128, 120, 0.09);
+}
+
+.sidebar-watched__group-toggle > i {
   display: grid;
   width: 18px;
   height: 18px;
@@ -3250,10 +3475,21 @@ html[data-compact="true"] body {
   font-weight: 750;
 }
 
-.sidebar-watched__group > small > span {
+.sidebar-watched__group-toggle > span {
+  min-width: 0;
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sidebar-watched__group-toggle > svg {
+  flex: 0 0 auto;
+  transition: transform 140ms ease;
+}
+
+.sidebar-watched__group-toggle > svg.is-collapsed {
+  transform: rotate(-90deg);
 }
 
 .session-project-group > header {
@@ -3474,17 +3710,6 @@ html[data-compact="true"] body {
   gap: 1px;
 }
 
-.sidebar-watched__group > small {
-  overflow: hidden;
-  padding: 5px 7px 2px;
-  color: var(--subtle);
-  font-size: 8px;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
 .sidebar-watched__group > button {
   display: grid;
   width: 100%;
@@ -3500,6 +3725,17 @@ html[data-compact="true"] body {
   text-align: left;
 }
 
+.sidebar-watched__group > .sidebar-watched__group-toggle {
+  display: flex;
+  grid-template-columns: none;
+  min-height: 29px;
+  padding: 5px 7px 2px;
+  color: var(--subtle);
+  font-size: 8px;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
 .sidebar-watched__group > button:hover {
   color: var(--text);
   background: rgba(128, 128, 120, 0.09);
@@ -3510,6 +3746,10 @@ html[data-compact="true"] body {
   font-size: 9px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sidebar-watched__group > .sidebar-watched__group-toggle span {
+  font-size: inherit;
 }
 
 .sidebar-watched__group .legend-dot {
@@ -4090,10 +4330,22 @@ html[data-compact="true"] body {
 }
 
 .sidebar-watched__toggle,
-.sidebar-watched__group > small,
+.sidebar-watched__group-toggle,
 .sidebar-watched__group > button span,
 .sidebar-watched__empty {
   font-size: 10.5px;
+}
+
+@media (max-width: 1050px) {
+  .list-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .group-visibility-actions {
+    order: 3;
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
 }
 
 .session-project-group > header strong,
@@ -4198,7 +4450,17 @@ html[data-compact="true"] body {
   }
 
   .sidebar--collapsed {
+    width: 64px;
     padding: 16px 8px 14px;
+  }
+
+  .sidebar--peeked {
+    position: relative;
+    z-index: 35;
+    width: 252px;
+    box-shadow:
+      12px 0 34px rgba(20, 20, 18, 0.14),
+      1px 0 0 var(--line);
   }
 
   .sidebar--collapsed .brand {
@@ -4328,7 +4590,7 @@ html[data-compact="true"] body {
   font-size: 10px;
 }
 
-/* Subagent teams and the parent pet's playful manager mode. */
+/* Subagent presence is shown without implying a live status. */
 .chat-row--has-team {
   row-gap: 7px;
   padding-bottom: 12px;
@@ -4388,7 +4650,7 @@ html[data-compact="true"] body {
   transform: rotate(-90deg);
 }
 
-.subagent-team__manager {
+.subagent-team__icon {
   display: grid;
   width: 25px;
   height: 25px;
@@ -4410,7 +4672,7 @@ html[data-compact="true"] body {
 .subagent-card {
   display: grid;
   min-width: 0;
-  grid-template-columns: 25px minmax(0, 1fr) auto 12px;
+  grid-template-columns: 25px minmax(0, 1fr) 12px;
   align-items: center;
   gap: 7px;
   padding: 7px 8px;
@@ -4460,40 +4722,6 @@ html[data-compact="true"] body {
   font-size: 9px;
 }
 
-.subagent-card__status {
-  flex: 0 0 auto;
-  padding: 2px 5px;
-  border-radius: 999px;
-  font-size: 8.5px;
-  font-weight: 620;
-  white-space: nowrap;
-}
-
-.subagent-card__status--working {
-  color: color-mix(in srgb, var(--working) 78%, var(--text));
-  background: color-mix(in srgb, var(--working) 10%, transparent);
-}
-
-.subagent-card__status--attention {
-  color: color-mix(in srgb, var(--attention) 80%, var(--text));
-  background: color-mix(in srgb, var(--attention) 12%, transparent);
-}
-
-.subagent-card__status--idle {
-  color: color-mix(in srgb, var(--idle) 78%, var(--text));
-  background: color-mix(in srgb, var(--idle) 10%, transparent);
-}
-
-.subagent-card__status--error {
-  color: color-mix(in srgb, var(--error) 78%, var(--text));
-  background: color-mix(in srgb, var(--error) 10%, transparent);
-}
-
-.subagent-card__status--unavailable {
-  color: var(--muted);
-  background: color-mix(in srgb, var(--muted) 8%, transparent);
-}
-
 .subagent-team__more {
   display: grid;
   min-height: 38px;
@@ -4512,109 +4740,46 @@ html[data-compact="true"] body {
   transform-origin: 50% 50%;
 }
 
-.status-pet__manager {
-  position: absolute;
-  z-index: 6;
-  inset: 0;
-  pointer-events: none;
+.status-pet--presence {
+  opacity: 1;
 }
 
-.status-pet__manager-tie {
-  position: absolute;
-  top: 14px;
-  left: 13px;
-  width: 4px;
-  height: 8px;
-  background: #b94a51;
-  clip-path: polygon(50% 0, 100% 26%, 76% 100%, 24% 100%, 0 26%);
-  transform: translateX(-50%);
-  animation: manager-tie 1.8s ease-in-out infinite;
+.status-pet--presence .status-pet__body {
+  animation: subagent-presence 2.8s ease-in-out infinite;
 }
 
-.status-pet__manager-clipboard {
-  position: absolute;
-  top: 1px;
-  right: -4px;
-  width: 10px;
-  height: 13px;
-  border: 1px solid #8a7047;
-  border-radius: 2px;
-  background:
-    linear-gradient(#91754a, #91754a) 2px 4px / 6px 1px no-repeat,
-    linear-gradient(#91754a, #91754a) 2px 7px / 5px 1px no-repeat,
-    #e5c88d;
-  box-shadow: 0 1px 3px rgba(18, 18, 16, 0.2);
-  transform-origin: 20% 100%;
-  animation: manager-clipboard 1.9s ease-in-out infinite;
+.status-pet--presence .status-pet__mouth {
+  width: 6px;
+  height: 2px;
+  border-bottom-width: 1px;
 }
 
-.status-pet__manager-clipboard::before {
-  position: absolute;
-  top: -3px;
-  left: 2px;
-  width: 5px;
-  height: 3px;
-  border-radius: 2px 2px 0 0;
-  background: #766344;
-  content: "";
+.status-pet--presence .status-pet__signal {
+  background: var(--subtle);
+  animation: subagent-presence-signal 2.8s ease-in-out infinite;
 }
 
-.status-pet__manager-pointer {
-  position: absolute;
-  top: 12px;
-  left: -2px;
-  width: 9px;
-  height: 4px;
-  border: 1px solid var(--pet-border);
-  border-right: 0;
-  border-radius: 5px 0 0 5px;
-  background: var(--pet-fill);
-  transform-origin: 100% 50%;
-  animation: manager-point 1.15s ease-in-out infinite;
-}
-
-.status-pet--large .status-pet__manager {
-  transform: scale(1.28);
-}
-
-.status-pet--idle .status-pet__manager-clipboard {
-  filter: hue-rotate(55deg) saturate(0.85);
-}
-
-.status-pet--attention .status-pet__manager-pointer {
-  animation-duration: 0.62s;
-}
-
-@keyframes manager-point {
+@keyframes subagent-presence {
   0%,
   100% {
-    transform: rotate(10deg);
+    transform: translateY(0) rotate(-1deg);
   }
 
   50% {
-    transform: rotate(-18deg) translateX(-1px);
+    transform: translateY(-1px) rotate(1deg);
   }
 }
 
-@keyframes manager-clipboard {
+@keyframes subagent-presence-signal {
   0%,
   100% {
-    transform: rotate(3deg) translateY(0);
+    opacity: 0.45;
+    transform: scale(0.9);
   }
 
   50% {
-    transform: rotate(-7deg) translateY(-1px);
-  }
-}
-
-@keyframes manager-tie {
-  0%,
-  100% {
-    transform: translateX(-50%) rotate(2deg);
-  }
-
-  50% {
-    transform: translateX(-50%) rotate(-5deg);
+    opacity: 0.9;
+    transform: scale(1);
   }
 }
 
@@ -4635,10 +4800,77 @@ html[data-compact="true"] body {
   }
 }
 
+/* Archive rows have their own four-column layout. Keep these overrides after
+   the tracked-chat workspace rules so generic chat columns cannot win. */
+.archive-list__header {
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 150px) 76px;
+  gap: 14px;
+  padding-right: 15px;
+  padding-left: 62px;
+}
+
+.archive-row {
+  min-height: 72px;
+  grid-template-columns:
+    30px
+    minmax(0, 1fr)
+    minmax(120px, 150px)
+    76px;
+  gap: 14px;
+  padding-right: 14px;
+}
+
+.archive-row .chat-row__identity,
+.archive-row .chat-row__title {
+  min-width: 0;
+}
+
+.archive-row .chat-row__title strong {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.archive-row__date {
+  overflow: hidden;
+}
+
+.archive-row__date time {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.archive-row__actions {
+  min-width: 0;
+  align-items: center;
+}
+
+@media (max-width: 780px) {
+  .list-toolbar--archive {
+    align-items: stretch;
+  }
+
+  .archive-clear-button {
+    order: 3;
+  }
+
+  .archive-row {
+    grid-template-columns: 28px minmax(0, 1fr) 72px;
+    gap: 10px;
+  }
+
+  .archive-row__date {
+    grid-column: 2;
+  }
+
+  .archive-row__actions {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .status-pet__manager-tie,
-  .status-pet__manager-clipboard,
-  .status-pet__manager-pointer,
+  .sidebar,
+  .confirm-dialog,
   .subagent-card {
     animation: none !important;
     transition: none !important;

@@ -64,7 +64,6 @@ export function TrackedChatRow({
         agent={session.agent}
         status={session.status}
         sleeping={sleeping}
-        manager={visibleSubagents.length > 0}
         language={preferences.language}
       />
 
