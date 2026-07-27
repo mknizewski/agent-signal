@@ -32,6 +32,7 @@ import {
 } from "./services/notification-debouncer";
 import { TrackingStore } from "./services/store";
 import { resolveClaudeExecutable } from "./services/detector";
+import { claudeCodeSessionUrl } from "./services/claude-deep-link";
 
 let mainWindow: BrowserWindow | null = null;
 let dashboardManager: DashboardManager | null = null;
@@ -576,14 +577,18 @@ async function openSessionInSource(sessionId: string): Promise<void> {
   }
 
   if (record.source === "claude-code" && record.sessionId) {
+    const desktopUrl = claudeCodeSessionUrl(record.sessionId);
+    try {
+      await shell.openExternal(desktopUrl);
+      return;
+    } catch {
+      // Claude Code CLI remains available when Claude Desktop is not installed.
+    }
     const executable = resolveClaudeExecutable();
     if (!executable) {
       throw new Error(
-        "Nie znaleziono Claude Code CLI potrzebnego do otwarcia sesji."
+        "Nie znaleziono Claude Desktop ani Claude Code CLI potrzebnego do otwarcia sesji."
       );
-    }
-    if (!/^[a-zA-Z0-9_-]{1,128}$/.test(record.sessionId)) {
-      throw new Error("Identyfikator sesji Claude Code jest nieprawidłowy.");
     }
     const child =
       process.platform === "win32"
@@ -633,7 +638,9 @@ function parseUpdateTrackedSessionInput(
   const candidate = input as {
     sessionId?: unknown;
     pinned?: unknown;
+    titleOverride?: unknown;
     projectName?: unknown;
+    groupOverride?: unknown;
   };
   const result: UpdateTrackedSessionInput = {
     sessionId: parseSessionId(candidate.sessionId)
@@ -644,6 +651,17 @@ function parseUpdateTrackedSessionInput(
     }
     result.pinned = candidate.pinned;
   }
+  if (candidate.titleOverride !== undefined) {
+    if (
+      candidate.titleOverride !== null &&
+      (typeof candidate.titleOverride !== "string" ||
+        candidate.titleOverride.length > 120 ||
+        /[\u0000-\u001f\u007f]/.test(candidate.titleOverride))
+    ) {
+      throw new TypeError("Nieprawidłowa własna nazwa czatu.");
+    }
+    result.titleOverride = candidate.titleOverride;
+  }
   if (candidate.projectName !== undefined) {
     if (
       typeof candidate.projectName !== "string" ||
@@ -652,6 +670,16 @@ function parseUpdateTrackedSessionInput(
       throw new TypeError("Nieprawidłowa nazwa projektu.");
     }
     result.projectName = candidate.projectName;
+  }
+  if (candidate.groupOverride !== undefined) {
+    if (
+      candidate.groupOverride !== null &&
+      (typeof candidate.groupOverride !== "string" ||
+        candidate.groupOverride.length > 80)
+    ) {
+      throw new TypeError("Nieprawidłowe przypisanie grupy.");
+    }
+    result.groupOverride = candidate.groupOverride;
   }
   return result;
 }

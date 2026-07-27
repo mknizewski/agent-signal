@@ -172,7 +172,6 @@ export function CompactDashboard({
               (session) => session.subagents
             );
             const showSubagents =
-              agent === "codex" &&
               preferences.showSubagentTeams &&
               subagents.length > 0;
             const visibleSummary =
