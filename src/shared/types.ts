@@ -31,6 +31,8 @@ export interface TrackedSession extends DiscoveredSession {
   trackedAt: string;
   available: boolean;
   pinned: boolean;
+  titleOverride?: string;
+  groupOverride?: string;
   subagents: SessionSubagent[];
 }
 
@@ -53,6 +55,8 @@ export interface TrackedSessionRecord {
   summary: string;
   workingDirectory: string;
   projectName: string;
+  titleOverride?: string;
+  groupOverride?: string;
   pinned?: boolean;
   createdAt: string;
   updatedAt: string;
@@ -127,7 +131,9 @@ export interface TrackSessionsInput {
 export interface UpdateTrackedSessionInput {
   sessionId: string;
   pinned?: boolean;
+  titleOverride?: string | null;
   projectName?: string;
+  groupOverride?: string | null;
 }
 
 export interface UpdateProjectGroupInput {

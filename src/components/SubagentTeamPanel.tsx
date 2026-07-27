@@ -5,6 +5,7 @@ import {
   ExternalLink
 } from "lucide-react";
 import type {
+  AgentKind,
   AppLanguage,
   SessionSubagent
 } from "../shared/types";
@@ -13,6 +14,7 @@ import { StatusPet } from "./StatusPet";
 
 interface SubagentTeamPanelProps {
   subagents: SessionSubagent[];
+  agent: AgentKind;
   language: AppLanguage;
   onOpen(threadId: string): void;
 }
@@ -21,6 +23,7 @@ const MAX_VISIBLE_SUBAGENTS = 8;
 
 export function SubagentTeamPanel({
   subagents,
+  agent,
   language,
   onOpen
 }: SubagentTeamPanelProps) {
@@ -68,7 +71,7 @@ export function SubagentTeamPanel({
               onClick={() => onOpen(subagent.threadId)}
             >
               <StatusPet
-                agent="codex"
+                agent={agent}
                 status="idle"
                 size="mini"
                 presenceOnly
