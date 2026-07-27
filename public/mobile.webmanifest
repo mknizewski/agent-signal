@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "AgentSignal Mobile",
-  "short_name": "AgentSignal",
+  "name": "Agent Signal Mobile",
+  "short_name": "Agent Signal",
   "description": "Lokalny podgląd statusów Codex i Claude Code.",
   "start_url": "/",
   "scope": "/",

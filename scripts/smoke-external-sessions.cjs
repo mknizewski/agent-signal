@@ -8,6 +8,7 @@ const {
 async function main() {
   const providers = detectProviders();
   let sessions = [];
+  let subagents = [];
   const diagnostics = [];
   const inspectedThreadId = process.env.AGENT_SIGNAL_SMOKE_THREAD_ID;
 
@@ -15,8 +16,10 @@ async function main() {
     getCodexExecutable: () => providers.codex.executable,
     getTrackedCodexThreadIds: () =>
       inspectedThreadId ? [inspectedThreadId] : [],
-    onSessions: (nextSessions) => {
+    getTrackedClaudeSessionIds: () => [],
+    onSessions: (nextSessions, nextSubagents = []) => {
       sessions = nextSessions;
+      subagents = nextSubagents;
     },
     onDiagnostic: (message, error) => {
       diagnostics.push(`${message} ${error?.message ?? ""}`.trim());
@@ -35,6 +38,15 @@ async function main() {
   const claude = sessions.filter(
     (session) => session.source === "claude-code"
   ).length;
+  const subagentStatuses = subagents.reduce((counts, subagent) => {
+    counts[subagent.status] = (counts[subagent.status] ?? 0) + 1;
+    return counts;
+  }, {});
+  const inspectedSubagents = inspectedThreadId
+    ? subagents.filter(
+        (subagent) => subagent.parentThreadId === inspectedThreadId
+      ).length
+    : undefined;
 
   console.log(
     JSON.stringify({
@@ -42,6 +54,9 @@ async function main() {
       total: sessions.length,
       codex,
       claude,
+      subagents: subagents.length,
+      subagentStatuses,
+      inspectedSubagents,
       codexExecutable: providers.codex.executable,
       claudeAvailable: providers.claude.available,
       inspectedStatus: inspectedThreadId

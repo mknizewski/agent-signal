@@ -6,7 +6,7 @@ describe("mobileNotificationForTransition", () => {
     expect(
       mobileNotificationForTransition("working", "attention", "Płatności")
     ).toEqual({
-      title: "AgentSignal · wymaga uwagi",
+      title: "Agent Signal · do zatwierdzenia",
       body: "Płatności",
       status: "attention"
     });
@@ -16,7 +16,25 @@ describe("mobileNotificationForTransition", () => {
     expect(
       mobileNotificationForTransition("working", "idle", "Płatności")
     ).toEqual({
-      title: "AgentSignal · agent jest wolny",
+      title: "Agent Signal · agent jest wolny",
+      body: "Płatności",
+      status: "idle"
+    });
+  });
+
+  it("can mute approval notifications without muting completion", () => {
+    expect(
+      mobileNotificationForTransition(
+        "working",
+        "attention",
+        "Płatności",
+        false
+      )
+    ).toBeUndefined();
+    expect(
+      mobileNotificationForTransition("working", "idle", "Płatności", false)
+    ).toEqual({
+      title: "Agent Signal · agent jest wolny",
       body: "Płatności",
       status: "idle"
     });

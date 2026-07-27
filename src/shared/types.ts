@@ -2,6 +2,8 @@ export type AgentKind = "codex" | "claude";
 
 export type SessionSource = "codex-app" | "claude-code";
 
+export type AppLanguage = "pl" | "en";
+
 export type SessionStatus =
   | "working"
   | "attention"
@@ -16,6 +18,7 @@ export interface DiscoveredSession {
   title: string;
   summary: string;
   workingDirectory: string;
+  projectName: string;
   status: SessionStatus;
   statusText: string;
   createdAt: string;
@@ -27,6 +30,21 @@ export interface DiscoveredSession {
 export interface TrackedSession extends DiscoveredSession {
   trackedAt: string;
   available: boolean;
+  pinned: boolean;
+  titleOverride?: string;
+  groupOverride?: string;
+  subagents: SessionSubagent[];
+}
+
+export interface SessionSubagent {
+  id: string;
+  threadId: string;
+  parentThreadId: string;
+  title: string;
+  role?: string;
+  depth: number;
+  status: SessionStatus;
+  updatedAt: string;
 }
 
 export interface TrackedSessionRecord {
@@ -36,6 +54,10 @@ export interface TrackedSessionRecord {
   title: string;
   summary: string;
   workingDirectory: string;
+  projectName: string;
+  titleOverride?: string;
+  groupOverride?: string;
+  pinned?: boolean;
   createdAt: string;
   updatedAt: string;
   trackedAt: string;
@@ -50,6 +72,35 @@ export interface ArchivedSessionRecord extends TrackedSessionRecord {
 export interface TrackingState {
   trackedSessions: TrackedSessionRecord[];
   archivedSessions: ArchivedSessionRecord[];
+  preferences: AppPreferences;
+  projectGroups: ProjectGroupConfig[];
+}
+
+export interface ProjectGroupConfig {
+  projectKey: string;
+  label?: string;
+  symbol?: string;
+  color?: string;
+  collapsed?: boolean;
+  sidebarCollapsed?: boolean;
+  order: number;
+}
+
+export interface AppPreferences {
+  language: AppLanguage;
+  groupTrackedByProject: boolean;
+  autoGroupProjects: boolean;
+  groupPickerByProject: boolean;
+  openChatOnDoubleClick: boolean;
+  enablePinning: boolean;
+  watchedSidebarExpanded: boolean;
+  idlePetAnimation: boolean;
+  idleAfterMinutes: number;
+  detectNewSessions: boolean;
+  promptForNewSessions: boolean;
+  systemNotifications: boolean;
+  approvalNotifications: boolean;
+  showSubagentTeams: boolean;
 }
 
 export interface ProviderStatus {
@@ -67,11 +118,40 @@ export interface AppSnapshot {
   archivedSessions: ArchivedSessionRecord[];
   availableSessions: DiscoveredSession[];
   providers: Record<AgentKind, ProviderStatus>;
+  preferences: AppPreferences;
+  projectGroups: ProjectGroupConfig[];
+  pendingSessionPrompts: string[];
   updatedAt: string;
 }
 
 export interface TrackSessionsInput {
   sessionIds: string[];
+}
+
+export interface UpdateTrackedSessionInput {
+  sessionId: string;
+  pinned?: boolean;
+  titleOverride?: string | null;
+  projectName?: string;
+  groupOverride?: string | null;
+}
+
+export interface UpdateProjectGroupInput {
+  projectKey: string;
+  label?: string;
+  symbol?: string;
+  color?: string;
+  collapsed?: boolean;
+  sidebarCollapsed?: boolean;
+}
+
+export interface ReorderProjectGroupsInput {
+  projectKeys: string[];
+}
+
+export interface SetProjectGroupsCollapsedInput {
+  projectKeys: string[];
+  collapsed: boolean;
 }
 
 export interface MobileSessionSummary {
@@ -129,8 +209,24 @@ export interface AgentSignalApi {
   getSnapshot(): Promise<AppSnapshot>;
   trackSessions(input: TrackSessionsInput): Promise<AppSnapshot>;
   archiveSession(sessionId: string): Promise<AppSnapshot>;
+  archiveSessions(input: TrackSessionsInput): Promise<AppSnapshot>;
   restoreArchivedSession(sessionId: string): Promise<AppSnapshot>;
   deleteArchivedSession(sessionId: string): Promise<AppSnapshot>;
+  deleteArchivedSessions(input: TrackSessionsInput): Promise<AppSnapshot>;
+  updateTrackedSession(input: UpdateTrackedSessionInput): Promise<AppSnapshot>;
+  updatePreferences(
+    patch: Partial<AppPreferences>
+  ): Promise<AppSnapshot>;
+  updateProjectGroup(input: UpdateProjectGroupInput): Promise<AppSnapshot>;
+  reorderProjectGroups(
+    input: ReorderProjectGroupsInput
+  ): Promise<AppSnapshot>;
+  setProjectGroupsCollapsed(
+    input: SetProjectGroupsCollapsedInput
+  ): Promise<AppSnapshot>;
+  dismissSessionPrompt(sessionId: string): Promise<AppSnapshot>;
+  openSession(sessionId: string): Promise<void>;
+  openCodexThread(threadId: string): Promise<void>;
   refresh(): Promise<AppSnapshot>;
   setCompactMode(compact: boolean): Promise<void>;
   setWindowTheme(theme: "light" | "dark"): Promise<void>;

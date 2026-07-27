@@ -41,6 +41,16 @@ function toolOutput(callId: string): string {
   });
 }
 
+function reasoning(): string {
+  return JSON.stringify({
+    type: "response_item",
+    payload: {
+      type: "reasoning",
+      encrypted_content: "redacted"
+    }
+  });
+}
+
 describe("Codex session log activity", () => {
   it("marks an open Codex task as working", () => {
     const state = reduceCodexLogLines([event("task_started", "turn-1")]);
@@ -132,6 +142,18 @@ describe("Codex session log activity", () => {
     });
   });
 
+  it("keeps a reasoning-only active turn working instead of guessing approval", () => {
+    const state = reduceCodexLogLines([
+      event("task_started", "turn-1"),
+      reasoning()
+    ]);
+
+    expect(state).toEqual({
+      activity: "working",
+      activeTurnId: "turn-1"
+    });
+  });
+
   it("clears outstanding attention calls when the turn ends", () => {
     const state = reduceCodexLogLines([
       event("task_started", "turn-1"),
@@ -168,6 +190,40 @@ describe("Codex session log activity", () => {
       await appendFile(logPath, `${toolOutput("approval-1")}\n`, "utf8");
       [result] = await tracker.enrich([thread], [thread.id]);
       expect(result.logActivity).toBe("working");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("reads the bounded tail of a large log and keeps tracking new events", async () => {
+    const directory = await mkdtemp(
+      path.join(tmpdir(), "agent-signal-large-codex-log-")
+    );
+    const logPath = path.join(directory, "session.jsonl");
+    const tracker = new CodexSessionLogTracker();
+    const thread = { id: "thread-large", path: logPath };
+
+    try {
+      const oversizedRecord = JSON.stringify({
+        type: "ignored",
+        payload: "x".repeat(3 * 1024 * 1024)
+      });
+      await writeFile(
+        logPath,
+        `${oversizedRecord}\n${event("task_started", "turn-tail")}\n`,
+        "utf8"
+      );
+
+      let [result] = await tracker.enrich([thread], [thread.id]);
+      expect(result.logActivity).toBe("working");
+
+      await appendFile(
+        logPath,
+        `${event("task_complete", "turn-tail")}\n`,
+        "utf8"
+      );
+      [result] = await tracker.enrich([thread], [thread.id]);
+      expect(result.logActivity).toBe("idle");
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

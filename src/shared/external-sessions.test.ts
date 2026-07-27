@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { mapClaudeSession, mapCodexThread } from "./external-sessions";
+import {
+  extractCodexCollabStatuses,
+  isCodexSubagentThread,
+  mapClaudeSession,
+  mapCodexSubagent,
+  mapCodexThread
+} from "./external-sessions";
 
 const now = new Date("2026-07-24T12:00:00.000Z");
 
@@ -99,6 +105,221 @@ describe("external session mapping", () => {
     expect(session.status).toBe("unavailable");
   });
 
+  it("maps a spawned Codex thread to its explicit parent session", () => {
+    const thread = {
+      id: "child-thread",
+      agentNickname: "Scout",
+      agentRole: "Explore the provider API",
+      updatedAt: now.getTime() - 2_000,
+      status: { type: "active" },
+      source: {
+        subAgent: {
+          thread_spawn: {
+            parent_thread_id: "parent-thread",
+            depth: 1,
+            agent_nickname: "Fallback",
+            agent_role: "Fallback role"
+          }
+        }
+      }
+    };
+
+    expect(isCodexSubagentThread(thread)).toBe(true);
+    expect(mapCodexSubagent(thread, now)).toMatchObject({
+      threadId: "child-thread",
+      parentThreadId: "parent-thread",
+      title: "Scout",
+      role: "Explore the provider API",
+      depth: 1,
+      status: "working"
+    });
+  });
+
+  it("does not infer completion from a not-loaded subagent thread", () => {
+    const subagent = mapCodexSubagent(
+      {
+        id: "completed-child",
+        preview: "Run regression tests",
+        status: { type: "notLoaded" },
+        source: {
+          subAgent: {
+            thread_spawn: {
+              parent_thread_id: "parent-thread",
+              depth: 2
+            }
+          }
+        }
+      },
+      now
+    );
+
+    expect(subagent?.status).toBe("unavailable");
+    expect(subagent?.depth).toBe(2);
+  });
+
+  it("uses the parent collab state when a running subagent is not loaded", () => {
+    const thread = {
+      id: "running-child",
+      status: { type: "notLoaded" },
+      source: {
+        subAgent: {
+          thread_spawn: {
+            parent_thread_id: "parent-thread"
+          }
+        }
+      }
+    };
+
+    expect(mapCodexSubagent(thread, now, "running")?.status).toBe(
+      "working"
+    );
+    expect(mapCodexSubagent(thread, now, "completed")?.status).toBe(
+      "idle"
+    );
+  });
+
+  it("keeps a live child working when the parent state is stale", () => {
+    const subagent = mapCodexSubagent(
+      {
+        id: "live-child",
+        status: { type: "active" },
+        source: {
+          subAgent: {
+            thread_spawn: {
+              parent_thread_id: "parent-thread"
+            }
+          }
+        }
+      },
+      now,
+      "completed"
+    );
+
+    expect(subagent?.status).toBe("working");
+  });
+
+  it("extracts the latest official collab state per child thread", () => {
+    const statuses = extractCodexCollabStatuses({
+      id: "parent-thread",
+      turns: [
+        {
+          items: [
+            {
+              type: "collabAgentToolCall",
+              agentsStates: {
+                "child-one": { status: "pendingInit" },
+                "child-two": { status: "running" }
+              }
+            }
+          ]
+        },
+        {
+          items: [
+            {
+              type: "collabAgentToolCall",
+              agentsStates: {
+                "child-one": { status: "running" },
+                "child-two": { status: "completed" },
+                malformed: { status: "madeUp" }
+              }
+            }
+          ]
+        }
+      ]
+    });
+
+    expect(Object.fromEntries(statuses)).toEqual({
+      "child-one": "running",
+      "child-two": "completed"
+    });
+  });
+
+  it("uses the parent turn lifecycle when Codex only persists subagent activity", () => {
+    const running = extractCodexCollabStatuses({
+      id: "running-parent",
+      turns: [
+        {
+          status: "inProgress",
+          items: [
+            {
+              type: "subAgentActivity",
+              kind: "started",
+              agentThreadId: "running-child"
+            }
+          ]
+        }
+      ]
+    });
+    const completed = extractCodexCollabStatuses({
+      id: "completed-parent",
+      turns: [
+        {
+          status: "completed",
+          items: [
+            {
+              type: "collabAgentToolCall",
+              agentsStates: {
+                "completed-child": { status: "running" }
+              }
+            },
+            {
+              type: "subAgentActivity",
+              kind: "started",
+              agentThreadId: "completed-child"
+            }
+          ]
+        }
+      ]
+    });
+
+    expect(Object.fromEntries(running)).toEqual({
+      "running-child": "running"
+    });
+    expect(Object.fromEntries(completed)).toEqual({
+      "completed-child": "completed"
+    });
+  });
+
+  it("keeps an explicitly completed child completed while its parent still runs", () => {
+    const statuses = extractCodexCollabStatuses({
+      id: "mixed-parent",
+      turns: [
+        {
+          status: "inProgress",
+          items: [
+            {
+              type: "collabAgentToolCall",
+              agentsStates: {
+                "done-child": { status: "completed" }
+              }
+            },
+            {
+              type: "subAgentActivity",
+              kind: "started",
+              agentThreadId: "done-child"
+            }
+          ]
+        }
+      ]
+    });
+
+    expect(statuses.get("done-child")).toBe("completed");
+  });
+
+  it("does not infer a team relationship without thread-spawn metadata", () => {
+    const unrelatedThread = {
+      id: "review-thread",
+      agentNickname: "Reviewer",
+      status: { type: "active" },
+      source: {
+        subAgent: "review"
+      }
+    };
+
+    expect(isCodexSubagentThread(unrelatedThread)).toBe(false);
+    expect(mapCodexSubagent(unrelatedThread, now)).toBeUndefined();
+  });
+
   it("maps recent Claude Code transcripts to working sessions", () => {
     const session = mapClaudeSession(
       {
@@ -113,5 +334,49 @@ describe("external session mapping", () => {
 
     expect(session.status).toBe("working");
     expect(session.source).toBe("claude-code");
+  });
+
+  it("keeps Claude working for a long-running open turn", () => {
+    const session = mapClaudeSession(
+      {
+        sessionId: "claude-working",
+        summary: "Długi test",
+        lastModified: now.getTime() - 5 * 60_000,
+        logActivity: "working"
+      },
+      now
+    );
+
+    expect(session.status).toBe("working");
+    expect(session.statusText).toContain("Aktywna tura");
+  });
+
+  it("maps an explicit Claude question to attention", () => {
+    const session = mapClaudeSession(
+      {
+        sessionId: "claude-question",
+        summary: "Potrzebna decyzja",
+        lastModified: now.getTime() - 60_000,
+        logActivity: "attention"
+      },
+      now
+    );
+
+    expect(session.status).toBe("attention");
+    expect(session.statusText).toContain("czeka");
+  });
+
+  it("does not report an abandoned stale Claude turn as working", () => {
+    const session = mapClaudeSession(
+      {
+        sessionId: "claude-stale",
+        summary: "Przerwana praca",
+        lastModified: now.getTime() - 31 * 60_000,
+        logActivity: "working"
+      },
+      now
+    );
+
+    expect(session.status).toBe("unavailable");
   });
 });

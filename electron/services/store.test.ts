@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { TrackedSessionRecord } from "../../src/shared/types";
 import { TrackingStore } from "./store";
+import { DEFAULT_PREFERENCES } from "../../src/shared/preferences";
 
 const temporaryDirectories: string[] = [];
 
@@ -14,6 +15,8 @@ const trackedSession: TrackedSessionRecord = {
   title: "Test session",
   summary: "",
   workingDirectory: "D:\\Git\\project",
+  projectName: "project",
+  pinned: false,
   createdAt: "2026-07-24T10:00:00.000Z",
   updatedAt: "2026-07-24T12:00:00.000Z",
   trackedAt: "2026-07-24T11:00:00.000Z",
@@ -41,21 +44,37 @@ describe("TrackingStore", () => {
 
     expect(state).toEqual({
       trackedSessions: [trackedSession],
-      archivedSessions: []
+      archivedSessions: [],
+      preferences: DEFAULT_PREFERENCES,
+      projectGroups: []
     });
   });
 
-  it("persists active and archived sessions as version 3", async () => {
+  it("persists sessions, manual groups, preferences, and project groups as version 6", async () => {
     const directory = await createTemporaryDirectory();
     const store = new TrackingStore(directory);
     const archived = {
       ...trackedSession,
+      titleOverride: "Checkout incident",
+      groupOverride: "customer-portal",
       archivedAt: "2026-07-24T13:00:00.000Z"
     };
 
     await store.save({
       trackedSessions: [],
-      archivedSessions: [archived]
+      archivedSessions: [archived],
+      preferences: { ...DEFAULT_PREFERENCES, language: "en" },
+      projectGroups: [
+        {
+          projectKey: "project",
+          label: "Payments",
+          symbol: "P",
+          color: "#6f82e8",
+          collapsed: true,
+          sidebarCollapsed: true,
+          order: 0
+        }
+      ]
     });
 
     const stored = JSON.parse(
@@ -65,10 +84,23 @@ describe("TrackingStore", () => {
       )
     ) as unknown;
     expect(stored).toEqual({
-      version: 3,
+      version: 6,
       trackedSessions: [],
-      archivedSessions: [archived]
+      archivedSessions: [archived],
+      preferences: { ...DEFAULT_PREFERENCES, language: "en" },
+      projectGroups: [
+        {
+          projectKey: "project",
+          label: "Payments",
+          symbol: "P",
+          color: "#6f82e8",
+          collapsed: true,
+          sidebarCollapsed: true,
+          order: 0
+        }
+      ]
     });
+    expect((await store.load()).archivedSessions).toEqual([archived]);
   });
 });
 

@@ -16,13 +16,16 @@ import {
 } from "lucide-react";
 import { agentApi } from "../lib/api";
 import type {
+  AppLanguage,
   MobileGatewayStatus,
   MobilePairingSession
 } from "../shared/types";
 import { formatRelativeTime } from "../shared/status";
+import { copyFor } from "../lib/i18n";
 
 interface MobileDevicesModalProps {
   open: boolean;
+  language: AppLanguage;
   onClose(): void;
 }
 
@@ -34,8 +37,10 @@ const emptyStatus: MobileGatewayStatus = {
 
 export function MobileDevicesModal({
   open,
+  language,
   onClose
 }: MobileDevicesModalProps) {
+  const copy = copyFor(language);
   const [status, setStatus] = useState(emptyStatus);
   const [pairing, setPairing] = useState<MobilePairingSession>();
   const [step, setStep] = useState<"certificate" | "pairing">("certificate");
@@ -106,7 +111,7 @@ export function MobileDevicesModal({
   };
 
   const revoke = async (deviceId: string, name: string) => {
-    if (!window.confirm(`Odłączyć urządzenie „${name}”?`)) return;
+    if (!window.confirm(copy.mobile.disconnectConfirm(name))) return;
     setBusy(true);
     try {
       setStatus(await agentApi.revokeMobileDevice(deviceId));
@@ -120,7 +125,7 @@ export function MobileDevicesModal({
   const reset = async () => {
     if (
       !window.confirm(
-        "Zresetować cały dostęp mobilny?\n\nWszystkie telefony zostaną odłączone. Stary certyfikat trzeba będzie usunąć z Androida ręcznie."
+        copy.mobile.resetConfirm
       )
     ) {
       return;
@@ -155,13 +160,16 @@ export function MobileDevicesModal({
             <MonitorSmartphone size={20} />
           </span>
           <div>
-            <h2 id="mobile-devices-title">Urządzenia mobilne</h2>
-            <p>Podgląd AgentSignal na telefonie w tej samej sieci Wi‑Fi.</p>
+            <div className="mobile-devices-modal__title">
+              <h2 id="mobile-devices-title">{copy.mobile.title}</h2>
+              <span>{copy.mobile.preview}</span>
+            </div>
+            <p>{copy.mobile.subtitle}</p>
           </div>
           <button
             className="icon-button"
             type="button"
-            aria-label="Zamknij"
+            aria-label={copy.common.close}
             onClick={onClose}
           >
             <X size={18} />
@@ -180,12 +188,14 @@ export function MobileDevicesModal({
               </span>
               <div>
                 <strong>
-                  {status.running ? "Dostęp mobilny aktywny" : "Dostęp wyłączony"}
+                  {status.running
+                    ? copy.mobile.active
+                    : copy.mobile.disabled}
                 </strong>
                 <span>
                   {status.running
                     ? `${status.hostname} · ${status.address}`
-                    : "Gateway nie nasłuchuje w sieci"}
+                    : copy.mobile.notListening}
                 </span>
               </div>
             </div>
@@ -221,7 +231,7 @@ export function MobileDevicesModal({
               ) : (
                 <QrCode size={18} />
               )}
-              Połącz nowy telefon
+              {copy.mobile.connectPhone}
             </button>
           )}
 
@@ -230,12 +240,12 @@ export function MobileDevicesModal({
               <div className="mobile-pairing__steps">
                 <span className={step === "certificate" ? "is-active" : "is-done"}>
                   {step === "pairing" ? <Check size={12} /> : "1"}
-                  Certyfikat
+                  {copy.mobile.certificate}
                 </span>
                 <i />
                 <span className={step === "pairing" ? "is-active" : ""}>
                   2
-                  Parowanie
+                  {copy.mobile.pairing}
                 </span>
               </div>
 
@@ -244,16 +254,18 @@ export function MobileDevicesModal({
                   <div className="mobile-pairing__qr">
                     <img
                       src={pairing.certificateQrDataUrl}
-                      alt="Kod QR do pobrania certyfikatu"
+                      alt={copy.mobile.certificateQrAlt}
                     />
                   </div>
                   <div className="mobile-pairing__instructions">
-                    <span className="eyebrow">Pierwsze połączenie</span>
-                    <h3>Zaufaj certyfikatowi AgentSignal</h3>
+                    <span className="eyebrow">
+                      {copy.mobile.firstConnection}
+                    </span>
+                    <h3>{copy.mobile.trustCertificate}</h3>
                     <ol>
-                      <li>Zeskanuj kod telefonem i pobierz plik CA.</li>
-                      <li>Zainstaluj go jako certyfikat CA w Androidzie.</li>
-                      <li>Porównaj odcisk certyfikatu z wartością poniżej.</li>
+                      {copy.mobile.certificateSteps.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
                     </ol>
                     <code>{pairing.certificateFingerprint}</code>
                     <button
@@ -270,7 +282,7 @@ export function MobileDevicesModal({
                       ) : (
                         <ShieldCheck size={16} />
                       )}
-                      Certyfikat zainstalowany
+                      {copy.mobile.certificateInstalled}
                     </button>
                   </div>
                 </div>
@@ -279,16 +291,15 @@ export function MobileDevicesModal({
                   <div className="mobile-pairing__qr">
                     <img
                       src={pairing.pairingQrDataUrl}
-                      alt="Kod QR do sparowania telefonu"
+                      alt={copy.mobile.pairingQrAlt}
                     />
                   </div>
                   <div className="mobile-pairing__instructions">
-                    <span className="eyebrow">Bezpieczne parowanie</span>
-                    <h3>Zeskanuj kod w Androidzie</h3>
-                    <p>
-                      Kod działa jednorazowo i nie udostępnia telefonu poza
-                      lokalną siecią.
-                    </p>
+                    <span className="eyebrow">
+                      {copy.mobile.securePairing}
+                    </span>
+                    <h3>{copy.mobile.scanAndroid}</h3>
+                    <p>{copy.mobile.pairingDescription}</p>
                     <div
                       className={`mobile-pairing__timer ${
                         secondsLeft === 0 ? "is-expired" : ""
@@ -296,8 +307,8 @@ export function MobileDevicesModal({
                     >
                       <Link2 size={14} />
                       {secondsLeft > 0
-                        ? `Kod wygaśnie za ${secondsLeft} s`
-                        : "Kod wygasł"}
+                        ? copy.mobile.expiresIn(secondsLeft)
+                        : copy.mobile.expired}
                     </div>
                     {secondsLeft === 0 && (
                       <button
@@ -307,7 +318,7 @@ export function MobileDevicesModal({
                         onClick={() => void createPairing("pairing")}
                       >
                         <RotateCcw size={15} />
-                        Wygeneruj nowy kod
+                        {copy.mobile.regenerate}
                       </button>
                     )}
                   </div>
@@ -319,7 +330,7 @@ export function MobileDevicesModal({
           <section className="mobile-device-list">
             <div className="mobile-device-list__heading">
               <div>
-                <strong>Sparowane telefony</strong>
+                <strong>{copy.mobile.pairedPhones}</strong>
                 <span>{status.devices.length}</span>
               </div>
               {status.devices.length > 0 && (
@@ -327,7 +338,7 @@ export function MobileDevicesModal({
                   type="button"
                   onClick={reset}
                 >
-                  Resetuj dostęp
+                  {copy.mobile.reset}
                 </button>
               )}
             </div>
@@ -335,7 +346,7 @@ export function MobileDevicesModal({
             {status.devices.length === 0 ? (
               <div className="mobile-device-list__empty">
                 <Smartphone size={23} />
-                <span>Nie połączono jeszcze żadnego telefonu.</span>
+                <span>{copy.mobile.noPhones}</span>
               </div>
             ) : (
               status.devices.map((device) => (
@@ -351,22 +362,26 @@ export function MobileDevicesModal({
                     <strong>{device.name}</strong>
                     <span>
                       {device.connected
-                        ? "Połączono teraz"
-                        : `Ostatnio ${formatRelativeTime(device.lastSeenAt)}`}
+                        ? copy.mobile.connectedNow
+                        : `${copy.mobile.lastSeen} ${formatRelativeTime(
+                            device.lastSeenAt,
+                            now,
+                            language
+                          )}`}
                     </span>
                   </div>
                   {device.notificationsEnabled && (
                     <Bell
                       className="mobile-device-row__bell"
                       size={15}
-                      aria-label="Powiadomienia aktywne"
+                      aria-label={copy.mobile.notificationsActive}
                     />
                   )}
                   <button
                     className="row-action row-action--danger"
                     type="button"
-                    title="Odłącz telefon"
-                    aria-label={`Odłącz ${device.name}`}
+                    title={copy.mobile.disconnect}
+                    aria-label={`${copy.mobile.disconnect}: ${device.name}`}
                     onClick={() => revoke(device.id, device.name)}
                   >
                     <Trash2 size={15} />

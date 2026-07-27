@@ -1,152 +1,206 @@
 <p align="center">
-  <img src="build/icon.png" width="88" alt="AgentSignal" />
+  <img src="build/icon.png" width="88" alt="Agent Signal icon" />
 </p>
 
-<h1 align="center">AgentSignal</h1>
+<h1 align="center">Agent Signal</h1>
 
 <p align="center">
-  A calm, local desktop dashboard for monitoring selected Codex and Claude Code sessions.
+  A calm, local desktop dashboard for the Codex and Claude Code chats that need your attention.
 </p>
 
 <p align="center">
+  <img alt="Version 0.6.4" src="https://img.shields.io/badge/version-0.6.4-e85d6a" />
   <img alt="Windows 10 and 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-2563eb" />
-  <img alt="Electron" src="https://img.shields.io/badge/Electron-43-47848f" />
+  <img alt="Polish and English" src="https://img.shields.io/badge/UI-Polski%20%7C%20English-7b6fe5" />
   <img alt="MIT License" src="https://img.shields.io/badge/license-MIT-3db47a" />
   <img alt="Local first" src="https://img.shields.io/badge/data-local--first-e4a62b" />
 </p>
 
-AgentSignal is not another chat client. It does not create tasks, send prompts,
-or replace the official Codex and Claude Code applications. Instead, it lets
-you choose existing sessions and keep their status visible in one focused
-dashboard.
+![Agent Signal promotional artwork with animated status pets and red, yellow, and green signals](docs/screenshots/agent-signal-promo.png)
 
-![AgentSignal main dashboard](docs/screenshots/dashboard-dark.png)
+Agent Signal solves an attention-management problem created by parallel AI
+work. When several agents are running across different projects and providers,
+the user should not need to keep opening every conversation to find out which
+one is working, idle, or blocked on a decision.
 
-> All screenshots use demonstration data. They do not contain real
-> conversations or paths from the author's computer.
-
-## Features
-
-- Track selected Codex and Claude Code sessions in one place.
-- Automatically refresh status without sending prompts.
-- Traffic-light states: working, needs attention, and idle.
-- Detect pending Codex approval and user-input requests from local session logs.
-- Distinct animated pets for Codex and Claude.
-- Native notifications when a session needs attention or finishes working.
-- Search and filter tracked conversations.
-- Archive completed items, restore them later, or remove them from the
-  dashboard archive.
-- Light and dark themes.
-- Compact aggregate traffic-light view.
-- Optional Android dashboard paired by QR over the local Wi-Fi network.
-- Installable Android PWA with live status updates from the desktop app.
-- Android Web Push notifications while the desktop app remains active.
-- Manage, revoke, or reset trusted phones from the desktop application.
-- Persist tracked and archived sessions locally.
-- Minimal interface designed to feel at home beside Codex.
-
-### Add existing sessions
-
-Select **Dodaj czat** (Add chat) to see sessions found in the local Codex and
-Claude Code history. Selecting a session adds it only to the AgentSignal
-dashboard.
-
-![Selecting sessions to track](docs/screenshots/chat-picker.png)
-
-Archiving or deleting an entry in AgentSignal never deletes the original
-conversation. Permanent dashboard removal is intentionally available only
-from the archive.
-
-### Compact mode
-
-Choose **Widok → Tryb kompaktowy** (View → Compact mode) to shrink AgentSignal
-into a small traffic-light panel. It shows aggregate counts for every state
-and an exact per-agent summary.
+The application discovers existing local Codex and Claude Code sessions, lets
+the user choose which ones to watch, and presents their state in one consistent
+view. It is a companion dashboard, not another chat client: it never sends
+prompts, answers approval requests, or modifies source conversations.
 
 <p align="center">
-  <img src="docs/screenshots/compact-dark.png" width="372" alt="AgentSignal compact mode" />
+  <a href="https://github.com/mknizewski/agent-signal/releases/latest"><strong>Download for Windows</strong></a>
+  ·
+  <a href="docs/CASE_STUDY.md"><strong>Read the case study</strong></a>
+  ·
+  <a href="CHANGELOG.md"><strong>Changelog</strong></a>
+  ·
+  <a href="SECURITY.md"><strong>Security</strong></a>
 </p>
 
-### Android dashboard
+![Agent Signal dashboard with custom project groups, status pets, and a new-chat prompt](docs/screenshots/dashboard-projects-0.6.1.png)
 
-AgentSignal can serve an installable mobile dashboard directly from the
-desktop application. There is no separate AgentSignal backend and no cloud
-account. The computer continues to read the local Codex and Claude Code
-sources, while a paired Android phone receives a privacy-reduced status
-snapshot over the same private Wi-Fi network.
+> Every screenshot uses built-in demonstration data. No real conversation,
+> account, or local project path is shown.
 
-Requirements:
+## Why it exists
 
-- Android 12 or newer with a current version of Chrome.
-- The phone and computer connected to the same private IPv4 network.
-- AgentSignal running on the computer, either open or in the Windows tray.
-- Internet access only if background Web Push notifications are required.
+Running multiple agents in parallel saves execution time but creates
+coordination overhead:
 
-To connect a phone:
+- sessions are distributed across providers, projects, and windows;
+- approval requests can wait unnoticed;
+- repeatedly checking every chat interrupts focused work;
+- provider-specific interfaces do not provide one shared status view;
+- transcripts and project paths may be too sensitive for a hosted dashboard.
 
-1. Open **Urządzenia mobilne** from the phone icon in the dashboard header.
-2. Enable mobile access and allow AgentSignal through Windows Firewall only
-   for private networks.
-3. Select **Połącz nowy telefon**.
-4. Scan the certificate QR code, download the AgentSignal Local CA
-   certificate, and install it from Android settings as a CA certificate.
-5. Verify that the SHA-256 fingerprint shown by Android matches the value in
-   AgentSignal.
-6. Continue to the pairing step and scan the second, one-time QR code. The QR
-   uses the computer's private IPv4 address directly, so Android does not need
-   to resolve a `.local` hostname.
-7. In Chrome, choose **Add to Home screen** or **Install app**.
-8. Open the installed app and enable notifications.
+Agent Signal acts as a local attention router. It reduces each watched session
+to a small, conservative state model, notifies the user about meaningful
+transitions, and opens the original conversation when action is required.
 
-The pairing code expires after 60 seconds. Once paired, a phone reconnects
-automatically whenever AgentSignal is running. You can revoke an individual
-phone or reset all mobile access from the same desktop dialog.
+For the product reasoning, constraints, architecture, and engineering
+trade-offs behind this approach, see the
+[product and engineering case study](docs/CASE_STUDY.md).
 
-Mobile access is disabled on a fresh installation and can be started only
-from the desktop application. AgentSignal does not announce the gateway
-through mDNS. Knowing the computer's address or scanning the LAN is not enough
-to read any status data: mobile API calls require a trusted-device token
-created by the single-use QR pairing flow.
+## At a glance
 
-Closing the desktop window keeps AgentSignal active in the Windows tray.
-Choose **Wyjście** from the application or tray menu to stop monitoring and
-make the mobile dashboard go offline.
-
-To remove mobile access completely, revoke the phone in AgentSignal, uninstall
-the PWA, and remove **AgentSignal Local CA** from Android's user-installed
-credentials.
+- **Cross-provider monitoring** for local Codex and Claude Code sessions.
+- **Reliable attention states** based on explicit lifecycle evidence instead of
+  silence or elapsed-time guesses.
+- **Project workspace** with automatic or manual grouping, custom names,
+  pinning, search, ordering, and archive.
+- **Codex and Claude Code subagent visibility** based on explicit local
+  parent-child metadata.
+- **Desktop and mobile alerts** with a grace period for short-lived approval
+  waits.
+- **Compact signal view** for an always-visible aggregate status.
+- **Local-first operation** without an Agent Signal account, backend,
+  analytics, or telemetry.
+- **Optional Android dashboard** served directly by the desktop application on
+  the same private network.
 
 ## Status model
 
 | Color | Status | Meaning |
 | --- | --- | --- |
-| Red | Working | The agent is currently executing a task. |
-| Yellow | Needs attention | The session is waiting for a decision or user response. |
+| Red | Working | The source indicates that a turn is still executing. |
+| Yellow | Approval needed | An explicit approval or user-input request remains unresolved. |
 | Green | Idle | The agent is not currently working. |
-| Gray | Unavailable | The current session state could not be confirmed. |
+| Gray | Unavailable | There is not enough reliable information to claim another state. |
 
-Codex exposes its session list through the local App Server. For tracked
-conversations, AgentSignal also reads `task_started`, `task_complete`, and
-`turn_aborted` events from the local JSONL history. Pending
-`request_user_input` calls and commands requesting elevated permission are
-tracked until their matching response, so approval prompts switch the session
-to **Needs attention**. This also keeps long-running tasks marked as active
-even when the log is briefly quiet.
+### Codex
 
-Claude Code exposes local history through the official SDK's `listSessions`
-method. Its working state is inferred from the time of the latest session
-activity. Consumer Claude Chat and Cowork conversations are not imported.
+Codex sessions come from the local Codex App Server. For watched
+conversations, Agent Signal also reads the local JSONL event history
+incrementally.
+
+A session enters **Approval needed** only when the App Server reports
+`waitingOnApproval` or `waitingOnUserInput`, or when a matching permission or
+input tool call remains unresolved. Ordinary reasoning, a running command, or a
+quiet log does not become an approval wait merely because time has passed.
+
+### Claude Code
+
+Claude Code history comes from the official Claude Agent SDK. For watched
+conversations, Agent Signal incrementally reads the local JSONL transcript and
+keeps an open turn in **Working** until Claude records an explicit turn end.
+Unresolved `AskUserQuestion` and `ExitPlanMode` calls are shown as
+**Approval needed**.
+
+Consumer Claude Chat and Cowork conversations are not imported.
+
+### Notification behavior
+
+The dashboard reflects status immediately. Desktop and mobile notifications
+wait 10 seconds before reporting an approval wait, which keeps brief
+automatically resolved requests silent. Notification baselines are established
+after the initial provider synchronization so a fresh launch does not replay
+historical state changes.
+
+## Product tour
+
+### Organize the sessions worth watching
+
+The Add chat window discovers local sessions and can group them by project
+before they are added. Watched chats support custom display names, pinning,
+search, archiving, and direct navigation to their source application.
+
+Project groups can be detected from the working directory or assigned manually.
+Their names, badges, colors, order, and collapsed state are stored locally.
+
+![Project-aware chat picker](docs/screenshots/chat-picker.png)
+
+### See subagent teams in context
+
+When a watched Codex chat spawns subagents, Agent Signal attaches them to the
+real parent conversation instead of mixing them into the normal chat picker.
+Claude Code subagents are attached from the explicit per-session `subagents`
+directory stored beside the watched transcript. The team panel shows detected
+child roles and includes their count in compact mode.
+
+Codex relationships come from explicit thread-spawn metadata, with a parent
+thread read used when the general App Server list has not indexed a fresh
+child. Because child lifecycle data can be incomplete, the panel treats
+subagents as presence information and does not claim a reliable live status
+for each child.
+
+![Codex parent chat with a collapsible team of detected subagents](docs/screenshots/subagent-team-0.6.1.png)
+
+### Keep a compact signal in view
+
+Compact mode reports aggregate working, approval, idle, and provider counts in
+a small window. Status pets provide a recognizable visual signal, while the
+traffic-light colors and text remain the source of meaning.
+
+![Agent Signal compact mode](docs/screenshots/compact-dark-0.6.1-no-menu.jpg)
+
+## Mobile dashboard preview
+
+Agent Signal can serve an installable Android dashboard directly from the
+desktop application. There is no hosted relay: the computer continues to read
+local provider data and sends a privacy-reduced status snapshot to a paired
+phone on the same private Wi-Fi network.
+
+![Mobile-device management and pairing](docs/screenshots/mobile-devices-0.6.1.png)
+
+### Requirements
+
+- Android 12 or newer with a current Chrome release;
+- phone and computer on the same private IPv4 network;
+- Agent Signal running on the computer, open or in the Windows tray;
+- internet access only when background Web Push delivery is needed.
+
+### Pair a phone
+
+1. Open **Urządzenia mobilne** / **Mobile devices**.
+2. Enable mobile access and allow private-network access if Windows asks.
+3. Select **Połącz nowy telefon** / **Connect a new phone**.
+4. Scan the certificate QR code and install **Agent Signal Local CA** in
+   Android's CA certificate settings.
+5. Compare the SHA-256 fingerprint displayed by Android with Agent Signal.
+6. Scan the second, single-use pairing QR code before it expires.
+7. In Chrome, choose **Add to Home screen** or **Install app**.
+8. Open the installed app and optionally enable push notifications.
+
+Individual phones can be revoked, and all mobile access can be reset from the
+desktop application.
 
 ## Installation
 
 ### Windows installer
 
-1. Open the [latest AgentSignal release](https://github.com/mknizewski/agent-signal/releases/latest).
-2. Download `AgentSignal-Setup-<version>.exe`.
-3. Run the installer and choose an installation directory.
+1. Open the [latest Agent Signal release](https://github.com/mknizewski/agent-signal/releases/latest).
+2. Download `Agent Signal Setup <version>.exe`.
+3. Run the installer and follow the bilingual setup wizard.
 
-AgentSignal supports Windows 10 and Windows 11 on x64. It can run with Codex,
-Claude Code, or both sources installed.
+Version 0.6.4 targets Windows 10 and Windows 11 on x64 and works with Codex,
+Claude Code, or both. The GitHub-distributed installer is not currently
+Authenticode-signed.
+
+<p align="center">
+  <img src="docs/screenshots/installer-dark-0.6.1.jpg" width="48%" alt="Dark Agent Signal installer welcome screen" />
+  <img src="docs/screenshots/installer-directory-dark-0.6.1.jpg" width="48%" alt="Dark Agent Signal installer directory screen" />
+</p>
 
 ### Run from source
 
@@ -159,83 +213,87 @@ pnpm install
 pnpm dev
 ```
 
-Useful commands:
-
-```powershell
-pnpm typecheck       # TypeScript checks
-pnpm test            # unit tests
-pnpm test:sync-smoke # local provider integration smoke test
-pnpm test:mobile-smoke # paired mobile gateway smoke test
-pnpm build           # production build
-pnpm dist            # Windows installer in release/
-```
-
 ## Privacy and security
 
-AgentSignal is local-first:
+Agent Signal is local-first:
 
-- It has no AgentSignal backend or telemetry.
-- It does not send conversation content to an AgentSignal server.
-- It does not create agents or submit prompts.
-- It does not modify or delete original sessions.
-- It runs the Codex App Server locally over `stdio`.
-- It uses the Claude SDK only to list local sessions.
-- Its optional mobile gateway listens only on the selected private network
-  interface and accepts paired devices from the same IPv4 subnet.
-- It does not advertise the mobile gateway through mDNS; an unauthenticated
-  client cannot read the mobile API.
-- It sends mobile clients only titles, agent kinds, status labels, and update
-  times. Project paths, summaries, archives, and source session identifiers
-  are not part of the mobile API.
+- no Agent Signal backend, account, analytics, or telemetry;
+- no prompts sent and no automatic approval decisions;
+- no modification or deletion of source sessions;
+- local Codex App Server connection over `stdio`;
+- local Claude Code session listing through the official SDK;
+- no public-network listener and no mDNS advertisement;
+- authenticated, single-use QR pairing for mobile devices;
+- a reduced mobile API without project paths, summaries, archive data, or
+  source session identifiers.
 
-Tracked and archived sessions are stored by Electron in
-`agent-signal-state.json` inside the application's local data directory. That
-file can contain titles, identifiers, and project paths for sessions added to
-the dashboard. It is never included in this repository or uploaded by
-AgentSignal.
+Tracked sessions, archived entries, preferences, and project presentation are
+stored in `agent-signal-state.json` inside Electron's local application-data
+directory. This file can contain titles, local paths, and source identifiers,
+but Agent Signal does not upload it.
 
-The renderer runs with context isolation, sandboxing, and no Node.js access.
-IPC is limited to explicitly defined and validated operations. The application
-also uses a Content Security Policy, blocks new windows, and denies browser
-permission requests.
+The desktop renderer uses context isolation, sandboxing, no Node.js access, a
+Content Security Policy, validated IPC operations, blocked pop-up windows, and
+denied browser permission requests.
 
-The Android PWA requires a per-installation local CA because service workers
-and Web Push require a secure HTTPS origin. Private certificate and VAPID keys
-are encrypted with the operating-system-backed Electron `safeStorage` API.
-Pairing uses a 256-bit, single-use secret valid for 60 seconds. Persistent
-device tokens are stored on the phone in a Secure, HttpOnly, SameSite cookie;
-AgentSignal stores only token hashes.
+The Android PWA uses a per-installation local CA because service workers and Web
+Push require HTTPS. Private certificate and VAPID keys are encrypted with
+Electron `safeStorage`. Pairing uses a 256-bit, single-use secret valid for 60
+seconds. A persistent phone token is stored in a Secure, HttpOnly, SameSite
+cookie; only its hash is retained by Agent Signal.
 
-Web Push payloads contain the notification title, tracked session title, and
-new status. They are encrypted according to the Web Push protocol and sent
-directly from the running desktop application to the browser push endpoint.
-There is no AgentSignal relay or hosted backend.
-
-See [SECURITY.md](SECURITY.md) for vulnerability reporting instructions.
-
-## Project layout
-
-```text
-electron/        main process, provider detection, and synchronization
-src/             React interface and shared status models
-docs/screenshots README assets
-scripts/         provider smoke test and icon generator
-build/           application icon
-```
+Web Push payloads contain only a notification title, watched-session title, and
+new status. See [SECURITY.md](SECURITY.md) for the complete security notes and
+vulnerability-reporting process.
 
 ## Current limitations
 
-- Claude Code activity detection is based on the latest activity time.
-- AgentSignal does not control agents or answer approval requests.
-- Session history availability depends on the local Codex or Claude Code
-  installation.
-- The current installer targets Windows x64.
-- The mobile dashboard currently targets Android 12+ and works only within the
-  same private IPv4 subnet.
-- Some guest Wi-Fi networks block device-to-device traffic. AgentSignal uses
-  the computer's private IPv4 address for pairing and does not use mDNS.
-- Background mobile notifications require internet access to the browser's
-  Web Push service.
+- Agent Signal observes agents but does not control them or respond to approval
+  requests.
+- Local history and event availability depend on installed Codex and Claude
+  Code versions.
+- The packaged installer currently targets Windows x64.
+- The mobile dashboard targets Android 12+ on the same private IPv4 subnet.
+- Guest Wi-Fi networks can block device-to-device traffic.
+- Background mobile notifications depend on the browser's Web Push service.
+
+## Architecture and project layout
+
+The Electron main process owns provider access, persistence, desktop
+notifications, and the optional HTTPS mobile gateway. A sandboxed React
+renderer receives validated application snapshots through a narrow preload
+bridge.
+
+```text
+electron/         Electron lifecycle, provider sync, storage, and mobile gateway
+src/              React desktop/mobile UI and shared status models
+docs/             Product case study and demonstration screenshots
+scripts/          Provider, mobile, and packaged-application smoke tests
+build/            Application and installer assets
+```
+
+The architectural reasoning and trade-offs are documented in
+[docs/CASE_STUDY.md](docs/CASE_STUDY.md).
+
+## Development
+
+```powershell
+pnpm typecheck
+pnpm test
+pnpm test:sync-smoke
+pnpm test:mobile-smoke
+pnpm test:app-smoke
+pnpm build
+pnpm dist
+```
+
+The current release history is maintained in [CHANGELOG.md](CHANGELOG.md).
+
+## Contributing
+
+Issues and focused pull requests are welcome. Run the TypeScript checks and
+relevant tests before submitting changes to synchronization or status
+behavior. Include updated screenshots for visible UI changes.
 
 ## License
 

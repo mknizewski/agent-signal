@@ -3,13 +3,21 @@ import {
   type ChildProcessWithoutNullStreams
 } from "node:child_process";
 import readline from "node:readline";
-import type { DiscoveredSession } from "../../src/shared/types";
+import type {
+  DiscoveredSession,
+  SessionSubagent
+} from "../../src/shared/types";
 import {
+  extractCodexCollabStatuses,
+  isCodexSubagentThread,
+  mapCodexSubagent,
   mapClaudeSession,
   mapCodexThread,
   type ClaudeExternalSession,
+  type CodexCollabAgentStatus,
   type CodexExternalThread
 } from "../../src/shared/external-sessions";
+import { ClaudeSessionLogTracker } from "./claude-session-log";
 import { CodexSessionLogTracker } from "./codex-session-log";
 
 type JsonRpcId = string | number;
@@ -35,7 +43,11 @@ interface ClaudeSessionSdk {
 interface ExternalSessionSyncOptions {
   getCodexExecutable(): string | undefined;
   getTrackedCodexThreadIds(): string[];
-  onSessions(sessions: DiscoveredSession[]): void;
+  getTrackedClaudeSessionIds(): string[];
+  onSessions(
+    sessions: DiscoveredSession[],
+    subagents: SessionSubagent[]
+  ): void;
   onDiagnostic?(message: string, error?: unknown): void;
 }
 
@@ -45,6 +57,7 @@ const importClaudeSdk = new Function(
 
 const SYNC_INTERVAL_MS = 5_000;
 const EXTERNAL_SESSION_LIMIT = 100;
+const MAX_TRACKED_SUBAGENTS = 256;
 const CODEX_SOURCE_KINDS = [
   "cli",
   "vscode",
@@ -52,13 +65,23 @@ const CODEX_SOURCE_KINDS = [
   "appServer",
   "unknown"
 ];
+const CODEX_SUBAGENT_SOURCE_KINDS = [
+  "subAgent",
+  "subAgentReview",
+  "subAgentCompact",
+  "subAgentThreadSpawn",
+  "subAgentOther"
+];
 
 export class ExternalSessionSync {
   private codexClient?: CodexHistoryClient;
   private codexExecutable?: string;
   private codexSessions: DiscoveredSession[] = [];
+  private codexSubagents: SessionSubagent[] = [];
   private claudeSessions: DiscoveredSession[] = [];
+  private claudeSubagents: SessionSubagent[] = [];
   private readonly codexLogs = new CodexSessionLogTracker();
+  private readonly claudeLogs = new ClaudeSessionLogTracker();
   private timer?: NodeJS.Timeout;
   private refreshPromise?: Promise<void>;
   private stopped = false;
@@ -102,13 +125,17 @@ export class ExternalSessionSync {
         new Date(right.updatedAt).getTime() -
         new Date(left.updatedAt).getTime()
     );
-    this.options.onSessions(sessions);
+    this.options.onSessions(sessions, [
+      ...this.codexSubagents,
+      ...this.claudeSubagents
+    ]);
   }
 
   private async refreshCodex(): Promise<void> {
     const executable = this.options.getCodexExecutable();
     if (!executable) {
       this.codexSessions = [];
+      this.codexSubagents = [];
       this.codexClient?.close();
       this.codexClient = undefined;
       this.codexExecutable = undefined;
@@ -122,14 +149,38 @@ export class ExternalSessionSync {
     }
 
     try {
-      const threads = await this.codexClient.listThreads();
+      const [threads, subagentThreads] = await Promise.all([
+        this.codexClient.listThreads(CODEX_SOURCE_KINDS),
+        this.codexClient.listSubagentThreads()
+      ]);
+      const trackedThreadIds =
+        this.options.getTrackedCodexThreadIds();
       const enrichedThreads = await this.codexLogs.enrich(
-        threads,
-        this.options.getTrackedCodexThreadIds()
+        threads.filter((thread) => !isCodexSubagentThread(thread)),
+        trackedThreadIds
       );
       this.codexSessions = enrichedThreads.map((thread) =>
         mapCodexThread(thread)
       );
+      const trackedSubagents =
+        await this.codexClient.readTrackedSubagents(trackedThreadIds);
+      const subagentThreadsById = new Map(
+        subagentThreads.map((thread) => [thread.id, thread])
+      );
+      for (const thread of trackedSubagents.threads) {
+        subagentThreadsById.set(thread.id, thread);
+      }
+      this.codexSubagents = [...subagentThreadsById.values()]
+        .map((thread) =>
+          mapCodexSubagent(
+            thread,
+            new Date(),
+            trackedSubagents.statuses.get(thread.id)
+          )
+        )
+        .filter(
+          (subagent): subagent is SessionSubagent => Boolean(subagent)
+        );
     } catch (error) {
       this.options.onDiagnostic?.(
         "Nie udało się zsynchronizować historii Codexa.",
@@ -147,9 +198,21 @@ export class ExternalSessionSync {
         limit: EXTERNAL_SESSION_LIMIT,
         includeProgrammatic: true
       });
-      this.claudeSessions = sessions
-        .filter((session) => session.tag !== "__hidden")
+      const visibleSessions = sessions.filter(
+        (session) => session.tag !== "__hidden"
+      );
+      const trackedSessionIds =
+        this.options.getTrackedClaudeSessionIds();
+      const enrichedSessions = await this.claudeLogs.enrich(
+        visibleSessions,
+        trackedSessionIds
+      );
+      this.claudeSessions = enrichedSessions
         .map((session) => mapClaudeSession(session));
+      this.claudeSubagents = await this.claudeLogs.listSubagents(
+        visibleSessions,
+        trackedSessionIds
+      );
     } catch (error) {
       this.options.onDiagnostic?.(
         "Nie udało się zsynchronizować historii Claude Code.",
@@ -175,7 +238,72 @@ class CodexHistoryClient {
 
   constructor(private readonly executable: string) {}
 
-  async listThreads(): Promise<CodexExternalThread[]> {
+  async listSubagentThreads(): Promise<CodexExternalThread[]> {
+    try {
+      return await this.listThreads(CODEX_SUBAGENT_SOURCE_KINDS);
+    } catch {
+      // Older App Server versions do not recognize subagent source filters.
+      return [];
+    }
+  }
+
+  async readTrackedSubagents(
+    parentThreadIds: string[]
+  ): Promise<{
+    threads: CodexExternalThread[];
+    statuses: Map<string, CodexCollabAgentStatus>;
+  }> {
+    const statuses = new Map<string, CodexCollabAgentStatus>();
+    const uniqueParentIds = [...new Set(parentThreadIds)].slice(
+      0,
+      EXTERNAL_SESSION_LIMIT
+    );
+    const responses = await Promise.allSettled(
+      uniqueParentIds.map((threadId) =>
+        this.request("thread/read", {
+          threadId,
+          includeTurns: true
+        })
+      )
+    );
+
+    for (const response of responses) {
+      if (response.status !== "fulfilled") continue;
+      const payload = response.value as {
+        thread?: CodexExternalThread;
+      };
+      if (!payload.thread) continue;
+      for (const [threadId, status] of extractCodexCollabStatuses(
+        payload.thread
+      )) {
+        statuses.set(threadId, status);
+      }
+    }
+
+    const childResponses = await Promise.allSettled(
+      [...statuses.keys()]
+        .slice(0, MAX_TRACKED_SUBAGENTS)
+        .map((threadId) =>
+          this.request("thread/read", {
+            threadId,
+            includeTurns: false
+          })
+        )
+    );
+    const threads: CodexExternalThread[] = [];
+    for (const response of childResponses) {
+      if (response.status !== "fulfilled") continue;
+      const payload = response.value as {
+        thread?: CodexExternalThread;
+      };
+      if (payload.thread) threads.push(payload.thread);
+    }
+    return { threads, statuses };
+  }
+
+  async listThreads(
+    sourceKinds: string[] = CODEX_SOURCE_KINDS
+  ): Promise<CodexExternalThread[]> {
     await this.ensureReady();
 
     const threads: CodexExternalThread[] = [];
@@ -187,7 +315,7 @@ class CodexHistoryClient {
         limit: EXTERNAL_SESSION_LIMIT,
         sortKey: "updated_at",
         sortDirection: "desc",
-        sourceKinds: CODEX_SOURCE_KINDS
+        sourceKinds
       })) as {
         data?: CodexExternalThread[];
         nextCursor?: string | null;
@@ -254,8 +382,8 @@ class CodexHistoryClient {
     await this.request("initialize", {
       clientInfo: {
         name: "agent_signal_sync",
-        title: "AgentSignal Sync",
-        version: "0.6.0"
+        title: "Agent Signal Sync",
+        version: "0.6.4"
       },
       capabilities: { experimentalApi: true }
     });
@@ -290,7 +418,7 @@ class CodexHistoryClient {
         id: message.id,
         error: {
           code: -32601,
-          message: `AgentSignal Sync nie obsługuje żądania ${message.method}.`
+          message: `Agent Signal Sync nie obsługuje żądania ${message.method}.`
         }
       });
     }

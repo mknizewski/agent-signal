@@ -15,6 +15,7 @@ const session: DiscoveredSession = {
   title: "Napraw logowanie",
   summary: "Znajdź przyczynę błędu",
   workingDirectory: "D:\\Git\\portal",
+  projectName: "portal",
   status: "working",
   statusText: "Aktywność wykryta w Codex",
   createdAt: "2026-07-24T10:00:00.000Z",
@@ -24,10 +25,10 @@ const session: DiscoveredSession = {
 
 describe("tracking sessions", () => {
   it("creates a durable record and resolves current live status", () => {
-    const record = createTrackingRecord(
-      session,
-      "2026-07-24T12:01:00.000Z"
-    );
+    const record = {
+      ...createTrackingRecord(session, "2026-07-24T12:01:00.000Z"),
+      groupOverride: "payments"
+    };
     const [tracked] = resolveTrackedSessions([record], [
       { ...session, status: "attention" }
     ]);
@@ -48,6 +49,37 @@ describe("tracking sessions", () => {
     expect(tracked.available).toBe(false);
   });
 
+  it("keeps a manual group independent from refreshed source metadata", () => {
+    const record = {
+      ...createTrackingRecord(session),
+      groupOverride: "payments"
+    };
+    const [tracked] = resolveTrackedSessions(
+      [record],
+      [{ ...session, projectName: "portal-renamed" }]
+    );
+
+    expect(tracked.projectName).toBe("portal-renamed");
+    expect(tracked.groupOverride).toBe("payments");
+  });
+
+  it("keeps a custom chat name independent from refreshed source metadata", () => {
+    const record = {
+      ...createTrackingRecord(session),
+      titleOverride: "Awaria logowania"
+    };
+    const [tracked] = resolveTrackedSessions(
+      [record],
+      [{ ...session, title: "Automatycznie zmieniony tytuł" }]
+    );
+
+    expect(tracked.title).toBe("Awaria logowania");
+    expect(tracked.titleOverride).toBe("Awaria logowania");
+
+    const [unavailable] = resolveTrackedSessions([record], []);
+    expect(unavailable.title).toBe("Awaria logowania");
+  });
+
   it("removes tracked sessions from the add-chat catalog", () => {
     const record = createTrackingRecord(session);
     expect(untrackedSessions([record], [session])).toEqual([]);
@@ -55,10 +87,10 @@ describe("tracking sessions", () => {
   });
 
   it("archives the latest session metadata and restores its tracking record", () => {
-    const record = createTrackingRecord(
-      session,
-      "2026-07-24T12:01:00.000Z"
-    );
+    const record = {
+      ...createTrackingRecord(session, "2026-07-24T12:01:00.000Z"),
+      groupOverride: "payments"
+    };
     const archived = createArchivedSessionRecord(
       record,
       { ...session, title: "Naprawione logowanie" },
@@ -66,11 +98,30 @@ describe("tracking sessions", () => {
     );
 
     expect(archived.title).toBe("Naprawione logowanie");
+    expect(archived.groupOverride).toBe("payments");
     expect(archived.archivedAt).toBe("2026-07-24T13:00:00.000Z");
     expect(restoreTrackingRecord(archived)).toEqual({
       ...record,
       title: "Naprawione logowanie"
     });
+  });
+
+  it("preserves a custom chat name through archive and restore", () => {
+    const record = {
+      ...createTrackingRecord(session),
+      titleOverride: "Własna nazwa"
+    };
+    const archived = createArchivedSessionRecord(record, {
+      ...session,
+      title: "Nazwa ze źródła"
+    });
+
+    expect(archived.title).toBe("Własna nazwa");
+    expect(archived.titleOverride).toBe("Własna nazwa");
+    expect(restoreTrackingRecord(archived).titleOverride).toBe("Własna nazwa");
+
+    const unavailableArchive = createArchivedSessionRecord(record);
+    expect(unavailableArchive.title).toBe("Własna nazwa");
   });
 
   it("keeps archived sessions out of the add-chat catalog", () => {

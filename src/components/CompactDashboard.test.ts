@@ -9,12 +9,15 @@ const baseSession: TrackedSession = {
   title: "Test",
   summary: "",
   workingDirectory: "D:\\Git\\project",
+  projectName: "project",
   status: "working",
   statusText: "Agent wykonuje zadanie",
   createdAt: "2026-07-24T10:00:00.000Z",
   updatedAt: "2026-07-24T12:00:00.000Z",
   trackedAt: "2026-07-24T11:00:00.000Z",
-  available: true
+  pinned: false,
+  available: true,
+  subagents: []
 };
 
 describe("compact agent summary", () => {
@@ -34,6 +37,6 @@ describe("compact agent summary", () => {
         { ...baseSession, id: "codex:thread-2", status: "attention" },
         { ...baseSession, id: "codex:thread-3" }
       ])
-    ).toBe("2 wymagają uwagi · 1 pracuje");
+    ).toBe("2 czekają na zatwierdzenie · 1 pracuje");
   });
 });

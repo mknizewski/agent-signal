@@ -1,8 +1,13 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type {
   AgentSignalApi,
+  AppPreferences,
   AppSnapshot,
-  TrackSessionsInput
+  ReorderProjectGroupsInput,
+  SetProjectGroupsCollapsedInput,
+  TrackSessionsInput,
+  UpdateProjectGroupInput,
+  UpdateTrackedSessionInput
 } from "../src/shared/types";
 
 const api: AgentSignalApi = {
@@ -11,10 +16,30 @@ const api: AgentSignalApi = {
     ipcRenderer.invoke("sessions:track", input),
   archiveSession: (sessionId: string) =>
     ipcRenderer.invoke("sessions:archive", sessionId),
+  archiveSessions: (input: TrackSessionsInput) =>
+    ipcRenderer.invoke("sessions:archive-many", input),
   restoreArchivedSession: (sessionId: string) =>
     ipcRenderer.invoke("sessions:restore", sessionId),
   deleteArchivedSession: (sessionId: string) =>
     ipcRenderer.invoke("sessions:delete-archived", sessionId),
+  deleteArchivedSessions: (input: TrackSessionsInput) =>
+    ipcRenderer.invoke("sessions:delete-archived-many", input),
+  updateTrackedSession: (input: UpdateTrackedSessionInput) =>
+    ipcRenderer.invoke("sessions:update", input),
+  updatePreferences: (patch: Partial<AppPreferences>) =>
+    ipcRenderer.invoke("preferences:update", patch),
+  updateProjectGroup: (input: UpdateProjectGroupInput) =>
+    ipcRenderer.invoke("project-groups:update", input),
+  reorderProjectGroups: (input: ReorderProjectGroupsInput) =>
+    ipcRenderer.invoke("project-groups:reorder", input),
+  setProjectGroupsCollapsed: (input: SetProjectGroupsCollapsedInput) =>
+    ipcRenderer.invoke("project-groups:set-collapsed", input),
+  dismissSessionPrompt: (sessionId: string) =>
+    ipcRenderer.invoke("sessions:dismiss-prompt", sessionId),
+  openSession: (sessionId: string) =>
+    ipcRenderer.invoke("sessions:open", sessionId),
+  openCodexThread: (threadId: string) =>
+    ipcRenderer.invoke("subagents:open", threadId),
   refresh: () => ipcRenderer.invoke("sessions:refresh"),
   setCompactMode: (compact: boolean) =>
     ipcRenderer.invoke("window:compact", compact),

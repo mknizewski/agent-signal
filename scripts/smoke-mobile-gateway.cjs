@@ -72,7 +72,7 @@ async function main() {
 
     const mobilePage = await request(status.address, "/");
     assert.equal(mobilePage.statusCode, 200);
-    assert.match(mobilePage.body, /AgentSignal Mobile/);
+    assert.match(mobilePage.body, /Agent Signal Mobile/);
     console.log(
       `Mobile gateway smoke test passed at ${status.origin} (${status.address}).`
     );

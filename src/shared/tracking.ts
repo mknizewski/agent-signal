@@ -16,11 +16,13 @@ export function createTrackingRecord(
     title: session.title,
     summary: session.summary,
     workingDirectory: session.workingDirectory,
+    projectName: session.projectName,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
     trackedAt,
     threadId: session.threadId,
-    sessionId: session.sessionId
+    sessionId: session.sessionId,
+    pinned: false
   };
 }
 
@@ -30,8 +32,22 @@ export function createArchivedSessionRecord(
   archivedAt = new Date().toISOString()
 ): ArchivedSessionRecord {
   const latestRecord = currentSession
-    ? createTrackingRecord(currentSession, record.trackedAt)
-    : record;
+    ? {
+        ...createTrackingRecord(currentSession, record.trackedAt),
+        title: record.titleOverride || currentSession.title,
+        projectName: record.projectName || currentSession.projectName,
+        ...(record.titleOverride === undefined
+          ? {}
+          : { titleOverride: record.titleOverride }),
+        ...(record.groupOverride === undefined
+          ? {}
+          : { groupOverride: record.groupOverride }),
+        pinned: record.pinned ?? false
+      }
+    : {
+        ...record,
+        title: record.titleOverride || record.title
+      };
   return { ...latestRecord, archivedAt };
 }
 
@@ -44,7 +60,8 @@ export function restoreTrackingRecord(
 
 export function resolveTrackedSessions(
   records: TrackedSessionRecord[],
-  catalog: DiscoveredSession[]
+  catalog: DiscoveredSession[],
+  autoGroupProjects = true
 ): TrackedSession[] {
   const catalogById = new Map(catalog.map((session) => [session.id, session]));
 
@@ -53,16 +70,32 @@ export function resolveTrackedSessions(
     if (current) {
       return {
         ...current,
+        title: record.titleOverride || current.title,
+        projectName: autoGroupProjects
+          ? current.projectName
+          : record.projectName,
+        ...(record.titleOverride === undefined
+          ? {}
+          : { titleOverride: record.titleOverride }),
+        ...(record.groupOverride === undefined
+          ? {}
+          : { groupOverride: record.groupOverride }),
+        pinned: record.pinned ?? false,
         trackedAt: record.trackedAt,
-        available: true
+        available: true,
+        subagents: []
       };
     }
 
     return {
       ...record,
+      title: record.titleOverride || record.title,
+      projectName: record.projectName,
+      pinned: record.pinned ?? false,
       status: "unavailable",
       statusText: "Sesja nie jest obecnie widoczna",
-      available: false
+      available: false,
+      subagents: []
     };
   });
 }
