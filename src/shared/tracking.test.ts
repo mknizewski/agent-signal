@@ -63,6 +63,23 @@ describe("tracking sessions", () => {
     expect(tracked.groupOverride).toBe("payments");
   });
 
+  it("keeps a custom chat name independent from refreshed source metadata", () => {
+    const record = {
+      ...createTrackingRecord(session),
+      titleOverride: "Awaria logowania"
+    };
+    const [tracked] = resolveTrackedSessions(
+      [record],
+      [{ ...session, title: "Automatycznie zmieniony tytuł" }]
+    );
+
+    expect(tracked.title).toBe("Awaria logowania");
+    expect(tracked.titleOverride).toBe("Awaria logowania");
+
+    const [unavailable] = resolveTrackedSessions([record], []);
+    expect(unavailable.title).toBe("Awaria logowania");
+  });
+
   it("removes tracked sessions from the add-chat catalog", () => {
     const record = createTrackingRecord(session);
     expect(untrackedSessions([record], [session])).toEqual([]);
@@ -87,6 +104,24 @@ describe("tracking sessions", () => {
       ...record,
       title: "Naprawione logowanie"
     });
+  });
+
+  it("preserves a custom chat name through archive and restore", () => {
+    const record = {
+      ...createTrackingRecord(session),
+      titleOverride: "Własna nazwa"
+    };
+    const archived = createArchivedSessionRecord(record, {
+      ...session,
+      title: "Nazwa ze źródła"
+    });
+
+    expect(archived.title).toBe("Własna nazwa");
+    expect(archived.titleOverride).toBe("Własna nazwa");
+    expect(restoreTrackingRecord(archived).titleOverride).toBe("Własna nazwa");
+
+    const unavailableArchive = createArchivedSessionRecord(record);
+    expect(unavailableArchive.title).toBe("Własna nazwa");
   });
 
   it("keeps archived sessions out of the add-chat catalog", () => {

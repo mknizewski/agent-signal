@@ -90,6 +90,11 @@ const translations = {
     },
     row: {
       open: "Otwórz czat",
+      rename: "Zmień nazwę czatu",
+      renameLabel: "Własna nazwa czatu",
+      renamePlaceholder: "Wpisz własną nazwę",
+      saveName: "Zapisz nazwę",
+      resetName: "Przywróć nazwę z czatu",
       pin: "Przypnij czat",
       unpin: "Odepnij czat",
       moveToGroup: "Przenieś czat do grupy",
@@ -357,6 +362,11 @@ const translations = {
     },
     row: {
       open: "Open chat",
+      rename: "Rename chat",
+      renameLabel: "Custom chat name",
+      renamePlaceholder: "Enter a custom name",
+      saveName: "Save name",
+      resetName: "Restore name from chat",
       pin: "Pin chat",
       unpin: "Unpin chat",
       moveToGroup: "Move chat to group",

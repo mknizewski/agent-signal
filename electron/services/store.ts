@@ -144,10 +144,18 @@ function normalizeRecords(
   records: TrackedSessionRecord[]
 ): TrackedSessionRecord[] {
   return records.map((record) => {
-    const { groupOverride: rawGroupOverride, ...rest } = record;
+    const {
+      groupOverride: rawGroupOverride,
+      titleOverride: rawTitleOverride,
+      ...rest
+    } = record;
     const groupOverride =
       typeof rawGroupOverride === "string"
         ? rawGroupOverride.trim().slice(0, 80)
+        : undefined;
+    const titleOverride =
+      typeof rawTitleOverride === "string"
+        ? rawTitleOverride.trim().slice(0, 120) || undefined
         : undefined;
     return {
       ...rest,
@@ -155,6 +163,7 @@ function normalizeRecords(
         typeof record.projectName === "string"
           ? record.projectName
           : projectNameFromPath(record.workingDirectory),
+      ...(titleOverride === undefined ? {} : { titleOverride }),
       ...(groupOverride === undefined ? {} : { groupOverride }),
       pinned: record.pinned ?? false
     };

@@ -55,6 +55,7 @@ describe("TrackingStore", () => {
     const store = new TrackingStore(directory);
     const archived = {
       ...trackedSession,
+      titleOverride: "Checkout incident",
       groupOverride: "customer-portal",
       archivedAt: "2026-07-24T13:00:00.000Z"
     };

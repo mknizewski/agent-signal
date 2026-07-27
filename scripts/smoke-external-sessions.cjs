@@ -16,6 +16,7 @@ async function main() {
     getCodexExecutable: () => providers.codex.executable,
     getTrackedCodexThreadIds: () =>
       inspectedThreadId ? [inspectedThreadId] : [],
+    getTrackedClaudeSessionIds: () => [],
     onSessions: (nextSessions, nextSubagents = []) => {
       sessions = nextSessions;
       subagents = nextSubagents;
@@ -41,6 +42,11 @@ async function main() {
     counts[subagent.status] = (counts[subagent.status] ?? 0) + 1;
     return counts;
   }, {});
+  const inspectedSubagents = inspectedThreadId
+    ? subagents.filter(
+        (subagent) => subagent.parentThreadId === inspectedThreadId
+      ).length
+    : undefined;
 
   console.log(
     JSON.stringify({
@@ -50,6 +56,7 @@ async function main() {
       claude,
       subagents: subagents.length,
       subagentStatuses,
+      inspectedSubagents,
       codexExecutable: providers.codex.executable,
       claudeAvailable: providers.claude.available,
       inspectedStatus: inspectedThreadId

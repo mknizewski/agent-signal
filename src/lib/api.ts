@@ -264,6 +264,16 @@ const demoApi: AgentSignalApi = {
             ? {}
             : { projectName: input.projectName })
         };
+        if (input.titleOverride === null) {
+          delete next.titleOverride;
+          next.title =
+            demoCatalog.find((session) => session.id === item.id)?.title ||
+            next.title;
+        }
+        else if (input.titleOverride !== undefined) {
+          next.titleOverride = input.titleOverride;
+          next.title = input.titleOverride;
+        }
         if (input.groupOverride === null) delete next.groupOverride;
         else if (input.groupOverride !== undefined) {
           next.groupOverride = input.groupOverride;

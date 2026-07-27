@@ -1,10 +1,15 @@
 import {
   Archive,
+  Check,
   ExternalLink,
   GripVertical,
+  Pencil,
   Pin,
-  PinOff
+  PinOff,
+  RotateCcw,
+  X
 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type {
   AppPreferences,
   TrackedSession
@@ -25,6 +30,7 @@ interface TrackedChatRowProps {
   onOpen(sessionId: string): void;
   onOpenSubagent(threadId: string): void;
   onTogglePin(sessionId: string, pinned: boolean): void;
+  onRename(sessionId: string, titleOverride: string | null): void;
   projectGroups: Array<{
     key: string;
     name: string;
@@ -45,6 +51,7 @@ export function TrackedChatRow({
   onOpen,
   onOpenSubagent,
   onTogglePin,
+  onRename,
   projectGroups,
   onAssignGroup,
   dragging,
@@ -52,6 +59,17 @@ export function TrackedChatRow({
   onDragEnd
 }: TrackedChatRowProps) {
   const copy = copyFor(preferences.language);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleValue, setTitleValue] = useState(session.title);
+  useEffect(() => {
+    if (!editingTitle) setTitleValue(session.title);
+  }, [editingTitle, session.title]);
+  useEffect(() => {
+    if (!editingTitle) return;
+    renameInputRef.current?.focus();
+    renameInputRef.current?.select();
+  }, [editingTitle]);
   const sleeping = isSessionSleeping(
     session.status,
     session.updatedAt,
@@ -88,7 +106,7 @@ export function TrackedChatRow({
       onDoubleClick={(event) => {
         if (
           preferences.openChatOnDoubleClick &&
-          !(event.target as HTMLElement).closest("button, select")
+          !(event.target as HTMLElement).closest("button, input, select, form")
         ) {
           onOpen(session.id);
         }
@@ -125,10 +143,74 @@ export function TrackedChatRow({
       />
 
       <div className="chat-row__identity">
-        <div className="chat-row__title">
-          <strong>{session.title}</strong>
-          <span>{sourceLabel(session.agent)}</span>
-        </div>
+        {editingTitle ? (
+          <form
+            className="chat-row__rename-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const normalized = titleValue.trim();
+              onRename(session.id, normalized || null);
+              setEditingTitle(false);
+            }}
+          >
+            <input
+              ref={renameInputRef}
+              value={titleValue}
+              maxLength={120}
+              aria-label={copy.row.renameLabel}
+              placeholder={copy.row.renamePlaceholder}
+              onChange={(event) => setTitleValue(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Escape") return;
+                event.preventDefault();
+                setTitleValue(session.title);
+                setEditingTitle(false);
+              }}
+            />
+            <button type="submit" title={copy.row.saveName}>
+              <Check size={13} />
+            </button>
+            <button
+              type="button"
+              title={copy.row.resetName}
+              onClick={() => {
+                onRename(session.id, null);
+                setEditingTitle(false);
+              }}
+            >
+              <RotateCcw size={13} />
+            </button>
+            <button
+              type="button"
+              title={copy.common.cancel}
+              onClick={() => {
+                setTitleValue(session.title);
+                setEditingTitle(false);
+              }}
+            >
+              <X size={13} />
+            </button>
+          </form>
+        ) : (
+          <div className="chat-row__title">
+            <strong>{session.title}</strong>
+            <span>{sourceLabel(session.agent)}</span>
+            <button
+              className={`chat-row__rename ${
+                session.titleOverride ? "is-active" : ""
+              }`}
+              type="button"
+              title={copy.row.rename}
+              aria-label={`${copy.row.rename}: ${session.title}`}
+              onClick={() => {
+                setTitleValue(session.title);
+                setEditingTitle(true);
+              }}
+            >
+              <Pencil size={12} />
+            </button>
+          </div>
+        )}
         <p>
           {session.workingDirectory
             ? compactPath(session.workingDirectory)
@@ -198,8 +280,12 @@ export function TrackedChatRow({
       {visibleSubagents.length > 0 && (
         <SubagentTeamPanel
           subagents={visibleSubagents}
+          agent={session.agent}
           language={preferences.language}
-          onOpen={onOpenSubagent}
+          onOpen={(threadId) => {
+            if (session.agent === "codex") onOpenSubagent(threadId);
+            else onOpen(session.id);
+          }}
         />
       )}
     </article>

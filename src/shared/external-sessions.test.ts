@@ -335,4 +335,48 @@ describe("external session mapping", () => {
     expect(session.status).toBe("working");
     expect(session.source).toBe("claude-code");
   });
+
+  it("keeps Claude working for a long-running open turn", () => {
+    const session = mapClaudeSession(
+      {
+        sessionId: "claude-working",
+        summary: "Długi test",
+        lastModified: now.getTime() - 5 * 60_000,
+        logActivity: "working"
+      },
+      now
+    );
+
+    expect(session.status).toBe("working");
+    expect(session.statusText).toContain("Aktywna tura");
+  });
+
+  it("maps an explicit Claude question to attention", () => {
+    const session = mapClaudeSession(
+      {
+        sessionId: "claude-question",
+        summary: "Potrzebna decyzja",
+        lastModified: now.getTime() - 60_000,
+        logActivity: "attention"
+      },
+      now
+    );
+
+    expect(session.status).toBe("attention");
+    expect(session.statusText).toContain("czeka");
+  });
+
+  it("does not report an abandoned stale Claude turn as working", () => {
+    const session = mapClaudeSession(
+      {
+        sessionId: "claude-stale",
+        summary: "Przerwana praca",
+        lastModified: now.getTime() - 31 * 60_000,
+        logActivity: "working"
+      },
+      now
+    );
+
+    expect(session.status).toBe("unavailable");
+  });
 });
