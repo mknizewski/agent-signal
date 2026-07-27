@@ -13,6 +13,7 @@ import {
   DEFAULT_PREFERENCES,
   projectNameFromPath
 } from "../shared/preferences";
+import { setProjectGroupsCollapsed } from "../shared/project-groups";
 
 const demoNow = Date.now();
 
@@ -189,23 +190,25 @@ const demoApi: AgentSignalApi = {
     return demoSnapshot;
   },
   archiveSession: async (sessionId: string) => {
-    const removed = demoSnapshot.trackedSessions.find(
-      (item) => item.id === sessionId
+    return demoApi.archiveSessions({ sessionIds: [sessionId] });
+  },
+  archiveSessions: async (input: TrackSessionsInput) => {
+    const sessionIds = new Set(input.sessionIds);
+    const removed = demoSnapshot.trackedSessions.filter((item) =>
+      sessionIds.has(item.id)
     );
     demoSnapshot = {
       ...demoSnapshot,
       trackedSessions: demoSnapshot.trackedSessions.filter(
-        (item) => item.id !== sessionId
+        (item) => !sessionIds.has(item.id)
       ),
-      archivedSessions: removed
-        ? [
-            {
-              ...stripRuntimeStatus(removed),
-              archivedAt: new Date().toISOString()
-            },
-            ...demoSnapshot.archivedSessions
-          ]
-        : demoSnapshot.archivedSessions
+      archivedSessions: [
+        ...removed.map((item) => ({
+          ...stripRuntimeStatus(item),
+          archivedAt: new Date().toISOString()
+        })),
+        ...demoSnapshot.archivedSessions
+      ]
     };
     emitDemo();
     return demoSnapshot;
@@ -227,17 +230,22 @@ const demoApi: AgentSignalApi = {
     return demoSnapshot;
   },
   deleteArchivedSession: async (sessionId: string) => {
-    const removed = demoSnapshot.archivedSessions.find(
-      (item) => item.id === sessionId
+    return demoApi.deleteArchivedSessions({ sessionIds: [sessionId] });
+  },
+  deleteArchivedSessions: async (input: TrackSessionsInput) => {
+    const sessionIds = new Set(input.sessionIds);
+    const removed = demoSnapshot.archivedSessions.filter((item) =>
+      sessionIds.has(item.id)
     );
     demoSnapshot = {
       ...demoSnapshot,
       archivedSessions: demoSnapshot.archivedSessions.filter(
-        (item) => item.id !== sessionId
+        (item) => !sessionIds.has(item.id)
       ),
-      availableSessions: removed
-        ? [...demoSnapshot.availableSessions, archivedToDiscovered(removed)]
-        : demoSnapshot.availableSessions
+      availableSessions: [
+        ...demoSnapshot.availableSessions,
+        ...removed.map(archivedToDiscovered)
+      ]
     };
     emitDemo();
     return demoSnapshot;
@@ -245,19 +253,33 @@ const demoApi: AgentSignalApi = {
   updateTrackedSession: async (input) => {
     demoSnapshot = {
       ...demoSnapshot,
-      trackedSessions: demoSnapshot.trackedSessions.map((item) =>
-        item.id === input.sessionId
-          ? {
-              ...item,
-              ...(input.pinned === undefined
-                ? {}
-                : { pinned: input.pinned }),
-              ...(input.projectName === undefined
-                ? {}
-                : { projectName: input.projectName })
-            }
-          : item
-      )
+      trackedSessions: demoSnapshot.trackedSessions.map((item) => {
+        if (item.id !== input.sessionId) return item;
+        const next: TrackedSession = {
+          ...item,
+          ...(input.pinned === undefined
+            ? {}
+            : { pinned: input.pinned }),
+          ...(input.projectName === undefined
+            ? {}
+            : { projectName: input.projectName })
+        };
+        if (input.titleOverride === null) {
+          delete next.titleOverride;
+          next.title =
+            demoCatalog.find((session) => session.id === item.id)?.title ||
+            next.title;
+        }
+        else if (input.titleOverride !== undefined) {
+          next.titleOverride = input.titleOverride;
+          next.title = input.titleOverride;
+        }
+        if (input.groupOverride === null) delete next.groupOverride;
+        else if (input.groupOverride !== undefined) {
+          next.groupOverride = input.groupOverride;
+        }
+        return next;
+      })
     };
     emitDemo();
     return demoSnapshot;
@@ -295,6 +317,10 @@ const demoApi: AgentSignalApi = {
       if (input.collapsed) next.collapsed = true;
       else delete next.collapsed;
     }
+    if (input.sidebarCollapsed !== undefined) {
+      if (input.sidebarCollapsed) next.sidebarCollapsed = true;
+      else delete next.sidebarCollapsed;
+    }
     demoSnapshot = {
       ...demoSnapshot,
       projectGroups: [
@@ -317,6 +343,18 @@ const demoApi: AgentSignalApi = {
         ...(existing.get(projectKey) ?? { projectKey }),
         order
       }))
+    };
+    emitDemo();
+    return demoSnapshot;
+  },
+  setProjectGroupsCollapsed: async (input) => {
+    demoSnapshot = {
+      ...demoSnapshot,
+      projectGroups: setProjectGroupsCollapsed(
+        demoSnapshot.projectGroups,
+        input.projectKeys,
+        input.collapsed
+      )
     };
     emitDemo();
     return demoSnapshot;

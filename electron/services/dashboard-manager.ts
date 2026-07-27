@@ -6,6 +6,7 @@ import type {
   ProviderStatus,
   ProjectGroupConfig,
   ReorderProjectGroupsInput,
+  SetProjectGroupsCollapsedInput,
   SessionSubagent,
   TrackSessionsInput,
   TrackedSessionRecord,
@@ -17,7 +18,10 @@ import {
   normalizePreferences,
   projectNameFromPath
 } from "../../src/shared/preferences";
-import { normalizeProjectGroupConfigs } from "../../src/shared/project-groups";
+import {
+  normalizeProjectGroupConfigs,
+  setProjectGroupsCollapsed
+} from "../../src/shared/project-groups";
 import {
   createArchivedSessionRecord,
   createTrackingRecord,
@@ -55,8 +59,7 @@ export class DashboardManager {
     this.preferences = normalizePreferences(state.preferences);
     this.projectGroups = normalizeProjectGroupConfigs(state.projectGroups);
     this.providers = detectProviders();
-    this.emit();
-    this.startExternalSync();
+    await this.startExternalSync();
   }
 
   getSnapshot(): AppSnapshot {
@@ -70,14 +73,15 @@ export class DashboardManager {
       this.records,
       this.catalog,
       this.preferences.autoGroupProjects
-    ).map((session) => ({
-      ...session,
-      subagents: session.threadId
-        ? (subagentsByParent.get(session.threadId) ?? []).sort(
-            compareSubagents
-          )
-        : []
-    }));
+    ).map((session) => {
+      const parentId = session.threadId || session.sessionId;
+      return {
+        ...session,
+        subagents: parentId
+          ? (subagentsByParent.get(parentId) ?? []).sort(compareSubagents)
+          : []
+      };
+    });
     return {
       trackedSessions,
       archivedSessions: this.archivedRecords,
@@ -132,15 +136,24 @@ export class DashboardManager {
   }
 
   async archiveSession(sessionId: string): Promise<AppSnapshot> {
-    const record = this.records.find((item) => item.id === sessionId);
-    if (!record) {
-      throw new Error("Ten czat nie jest już obserwowany.");
+    return this.archiveSessions({ sessionIds: [sessionId] });
+  }
+
+  async archiveSessions(input: TrackSessionsInput): Promise<AppSnapshot> {
+    const requestedIds = [...new Set(input.sessionIds)];
+    const requestedSet = new Set(requestedIds);
+    const records = this.records.filter((item) => requestedSet.has(item.id));
+    if (records.length !== requestedIds.length) {
+      throw new Error("Co najmniej jeden czat nie jest już obserwowany.");
     }
-    const currentSession = this.catalog.find((item) => item.id === sessionId);
-    this.records = this.records.filter((item) => item.id !== sessionId);
-    this.archivedRecords.unshift(
-      createArchivedSessionRecord(record, currentSession)
-    );
+    const catalogById = new Map(this.catalog.map((item) => [item.id, item]));
+    this.records = this.records.filter((item) => !requestedSet.has(item.id));
+    this.archivedRecords = [
+      ...records.map((record) =>
+        createArchivedSessionRecord(record, catalogById.get(record.id))
+      ),
+      ...this.archivedRecords
+    ];
     this.persistAndEmit();
     return this.getSnapshot();
   }
@@ -160,13 +173,23 @@ export class DashboardManager {
   }
 
   async deleteArchivedSession(sessionId: string): Promise<AppSnapshot> {
-    const previousLength = this.archivedRecords.length;
-    this.archivedRecords = this.archivedRecords.filter(
-      (item) => item.id !== sessionId
+    return this.deleteArchivedSessions({ sessionIds: [sessionId] });
+  }
+
+  async deleteArchivedSessions(
+    input: TrackSessionsInput
+  ): Promise<AppSnapshot> {
+    const requestedIds = [...new Set(input.sessionIds)];
+    const requestedSet = new Set(requestedIds);
+    const records = this.archivedRecords.filter((item) =>
+      requestedSet.has(item.id)
     );
-    if (this.archivedRecords.length === previousLength) {
-      throw new Error("Ten czat nie znajduje się już w archiwum.");
+    if (records.length !== requestedIds.length) {
+      throw new Error("Co najmniej jeden czat nie znajduje się już w archiwum.");
     }
+    this.archivedRecords = this.archivedRecords.filter(
+      (item) => !requestedSet.has(item.id)
+    );
     this.persistAndEmit();
     return this.getSnapshot();
   }
@@ -182,8 +205,20 @@ export class DashboardManager {
         ? input.pinned
         : false;
     }
+    if (input.titleOverride !== undefined) {
+      if (input.titleOverride === null) delete record.titleOverride;
+      else {
+        const titleOverride = input.titleOverride.trim().slice(0, 120);
+        if (titleOverride) record.titleOverride = titleOverride;
+        else delete record.titleOverride;
+      }
+    }
     if (typeof input.projectName === "string") {
       record.projectName = input.projectName.trim().slice(0, 80);
+    }
+    if (input.groupOverride !== undefined) {
+      if (input.groupOverride === null) delete record.groupOverride;
+      else record.groupOverride = input.groupOverride.trim().slice(0, 80);
     }
     this.persistAndEmit();
     return this.getSnapshot();
@@ -253,6 +288,10 @@ export class DashboardManager {
       if (input.collapsed) next.collapsed = true;
       else delete next.collapsed;
     }
+    if (input.sidebarCollapsed !== undefined) {
+      if (input.sidebarCollapsed) next.sidebarCollapsed = true;
+      else delete next.sidebarCollapsed;
+    }
     this.projectGroups = normalizeProjectGroupConfigs([
       ...this.projectGroups.filter(
         (group) => group.projectKey !== input.projectKey
@@ -288,6 +327,18 @@ export class DashboardManager {
     return this.getSnapshot();
   }
 
+  setProjectGroupsCollapsed(
+    input: SetProjectGroupsCollapsedInput
+  ): AppSnapshot {
+    this.projectGroups = setProjectGroupsCollapsed(
+      this.projectGroups,
+      input.projectKeys,
+      input.collapsed
+    );
+    this.persistAndEmit();
+    return this.getSnapshot();
+  }
+
   dismissSessionPrompt(sessionId: string): AppSnapshot {
     this.pendingSessionPrompts.delete(sessionId);
     this.emit();
@@ -315,13 +366,19 @@ export class DashboardManager {
     await this.saveQueue;
   }
 
-  private startExternalSync(): void {
+  private async startExternalSync(): Promise<void> {
     this.externalSessionSync = new ExternalSessionSync({
       getCodexExecutable: () => this.providers.codex.executable,
       getTrackedCodexThreadIds: () =>
         this.records.flatMap((record) =>
           record.source === "codex-app" && record.threadId
             ? [record.threadId]
+            : []
+        ),
+      getTrackedClaudeSessionIds: () =>
+        this.records.flatMap((record) =>
+          record.source === "claude-code" && record.sessionId
+            ? [record.sessionId]
             : []
         ),
       onSessions: (sessions, subagents) => {
@@ -355,7 +412,7 @@ export class DashboardManager {
         console.warn(message, error);
       }
     });
-    void this.externalSessionSync.start().catch((error) => {
+    await this.externalSessionSync.start().catch((error) => {
       console.warn("Nie udało się uruchomić katalogu sesji.", error);
     });
   }

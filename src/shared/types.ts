@@ -31,6 +31,8 @@ export interface TrackedSession extends DiscoveredSession {
   trackedAt: string;
   available: boolean;
   pinned: boolean;
+  titleOverride?: string;
+  groupOverride?: string;
   subagents: SessionSubagent[];
 }
 
@@ -53,6 +55,8 @@ export interface TrackedSessionRecord {
   summary: string;
   workingDirectory: string;
   projectName: string;
+  titleOverride?: string;
+  groupOverride?: string;
   pinned?: boolean;
   createdAt: string;
   updatedAt: string;
@@ -78,6 +82,7 @@ export interface ProjectGroupConfig {
   symbol?: string;
   color?: string;
   collapsed?: boolean;
+  sidebarCollapsed?: boolean;
   order: number;
 }
 
@@ -126,7 +131,9 @@ export interface TrackSessionsInput {
 export interface UpdateTrackedSessionInput {
   sessionId: string;
   pinned?: boolean;
+  titleOverride?: string | null;
   projectName?: string;
+  groupOverride?: string | null;
 }
 
 export interface UpdateProjectGroupInput {
@@ -135,10 +142,16 @@ export interface UpdateProjectGroupInput {
   symbol?: string;
   color?: string;
   collapsed?: boolean;
+  sidebarCollapsed?: boolean;
 }
 
 export interface ReorderProjectGroupsInput {
   projectKeys: string[];
+}
+
+export interface SetProjectGroupsCollapsedInput {
+  projectKeys: string[];
+  collapsed: boolean;
 }
 
 export interface MobileSessionSummary {
@@ -196,8 +209,10 @@ export interface AgentSignalApi {
   getSnapshot(): Promise<AppSnapshot>;
   trackSessions(input: TrackSessionsInput): Promise<AppSnapshot>;
   archiveSession(sessionId: string): Promise<AppSnapshot>;
+  archiveSessions(input: TrackSessionsInput): Promise<AppSnapshot>;
   restoreArchivedSession(sessionId: string): Promise<AppSnapshot>;
   deleteArchivedSession(sessionId: string): Promise<AppSnapshot>;
+  deleteArchivedSessions(input: TrackSessionsInput): Promise<AppSnapshot>;
   updateTrackedSession(input: UpdateTrackedSessionInput): Promise<AppSnapshot>;
   updatePreferences(
     patch: Partial<AppPreferences>
@@ -205,6 +220,9 @@ export interface AgentSignalApi {
   updateProjectGroup(input: UpdateProjectGroupInput): Promise<AppSnapshot>;
   reorderProjectGroups(
     input: ReorderProjectGroupsInput
+  ): Promise<AppSnapshot>;
+  setProjectGroupsCollapsed(
+    input: SetProjectGroupsCollapsedInput
   ): Promise<AppSnapshot>;
   dismissSessionPrompt(sessionId: string): Promise<AppSnapshot>;
   openSession(sessionId: string): Promise<void>;

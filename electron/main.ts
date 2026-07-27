@@ -16,6 +16,7 @@ import type {
   AppSnapshot,
   MobileGatewayStatus,
   ReorderProjectGroupsInput,
+  SetProjectGroupsCollapsedInput,
   SessionStatus,
   TrackSessionsInput,
   UpdateProjectGroupInput,
@@ -31,6 +32,7 @@ import {
 } from "./services/notification-debouncer";
 import { TrackingStore } from "./services/store";
 import { resolveClaudeExecutable } from "./services/detector";
+import { claudeCodeSessionUrl } from "./services/claude-deep-link";
 
 let mainWindow: BrowserWindow | null = null;
 let dashboardManager: DashboardManager | null = null;
@@ -248,11 +250,19 @@ function registerIpc(): void {
   ipcMain.handle("sessions:archive", (_event, sessionId: unknown) =>
     requireManager().archiveSession(parseSessionId(sessionId))
   );
+  ipcMain.handle("sessions:archive-many", (_event, input: unknown) =>
+    requireManager().archiveSessions(parseTrackSessionsInput(input))
+  );
   ipcMain.handle("sessions:restore", (_event, sessionId: unknown) =>
     requireManager().restoreArchivedSession(parseSessionId(sessionId))
   );
   ipcMain.handle("sessions:delete-archived", (_event, sessionId: unknown) =>
     requireManager().deleteArchivedSession(parseSessionId(sessionId))
+  );
+  ipcMain.handle("sessions:delete-archived-many", (_event, input: unknown) =>
+    requireManager().deleteArchivedSessions(
+      parseArchivedSessionIdsInput(input)
+    )
   );
   ipcMain.handle("sessions:update", (_event, input: unknown) =>
     requireManager().updateTrackedSession(
@@ -268,6 +278,11 @@ function registerIpc(): void {
   ipcMain.handle("project-groups:reorder", (_event, input: unknown) =>
     requireManager().reorderProjectGroups(
       parseReorderProjectGroupsInput(input)
+    )
+  );
+  ipcMain.handle("project-groups:set-collapsed", (_event, input: unknown) =>
+    requireManager().setProjectGroupsCollapsed(
+      parseSetProjectGroupsCollapsedInput(input)
     )
   );
   ipcMain.handle("sessions:dismiss-prompt", (_event, sessionId: unknown) =>
@@ -466,6 +481,21 @@ function parseTrackSessionsInput(input: unknown): TrackSessionsInput {
   return { sessionIds: sessionIds.map(parseSessionId) };
 }
 
+function parseArchivedSessionIdsInput(input: unknown): TrackSessionsInput {
+  if (
+    !input ||
+    typeof input !== "object" ||
+    !Array.isArray((input as { sessionIds?: unknown }).sessionIds)
+  ) {
+    throw new TypeError("Nieprawidłowa lista czatów.");
+  }
+  const sessionIds = (input as { sessionIds: unknown[] }).sessionIds;
+  if (sessionIds.length === 0 || sessionIds.length > 10_000) {
+    throw new TypeError("Wybierz od 1 do 10000 czatów.");
+  }
+  return { sessionIds: sessionIds.map(parseSessionId) };
+}
+
 function parseSessionId(value: unknown): string {
   if (
     typeof value !== "string" ||
@@ -547,14 +577,18 @@ async function openSessionInSource(sessionId: string): Promise<void> {
   }
 
   if (record.source === "claude-code" && record.sessionId) {
+    const desktopUrl = claudeCodeSessionUrl(record.sessionId);
+    try {
+      await shell.openExternal(desktopUrl);
+      return;
+    } catch {
+      // Claude Code CLI remains available when Claude Desktop is not installed.
+    }
     const executable = resolveClaudeExecutable();
     if (!executable) {
       throw new Error(
-        "Nie znaleziono Claude Code CLI potrzebnego do otwarcia sesji."
+        "Nie znaleziono Claude Desktop ani Claude Code CLI potrzebnego do otwarcia sesji."
       );
-    }
-    if (!/^[a-zA-Z0-9_-]{1,128}$/.test(record.sessionId)) {
-      throw new Error("Identyfikator sesji Claude Code jest nieprawidłowy.");
     }
     const child =
       process.platform === "win32"
@@ -604,7 +638,9 @@ function parseUpdateTrackedSessionInput(
   const candidate = input as {
     sessionId?: unknown;
     pinned?: unknown;
+    titleOverride?: unknown;
     projectName?: unknown;
+    groupOverride?: unknown;
   };
   const result: UpdateTrackedSessionInput = {
     sessionId: parseSessionId(candidate.sessionId)
@@ -615,6 +651,17 @@ function parseUpdateTrackedSessionInput(
     }
     result.pinned = candidate.pinned;
   }
+  if (candidate.titleOverride !== undefined) {
+    if (
+      candidate.titleOverride !== null &&
+      (typeof candidate.titleOverride !== "string" ||
+        candidate.titleOverride.length > 120 ||
+        /[\u0000-\u001f\u007f]/.test(candidate.titleOverride))
+    ) {
+      throw new TypeError("Nieprawidłowa własna nazwa czatu.");
+    }
+    result.titleOverride = candidate.titleOverride;
+  }
   if (candidate.projectName !== undefined) {
     if (
       typeof candidate.projectName !== "string" ||
@@ -623,6 +670,16 @@ function parseUpdateTrackedSessionInput(
       throw new TypeError("Nieprawidłowa nazwa projektu.");
     }
     result.projectName = candidate.projectName;
+  }
+  if (candidate.groupOverride !== undefined) {
+    if (
+      candidate.groupOverride !== null &&
+      (typeof candidate.groupOverride !== "string" ||
+        candidate.groupOverride.length > 80)
+    ) {
+      throw new TypeError("Nieprawidłowe przypisanie grupy.");
+    }
+    result.groupOverride = candidate.groupOverride;
   }
   return result;
 }
@@ -711,6 +768,12 @@ function parseUpdateProjectGroupInput(
   ) {
     throw new TypeError("Nieprawidłowy stan grupy projektu.");
   }
+  if (
+    candidate.sidebarCollapsed !== undefined &&
+    typeof candidate.sidebarCollapsed !== "boolean"
+  ) {
+    throw new TypeError("Nieprawidłowy stan grupy projektu w menu bocznym.");
+  }
   return {
     projectKey: candidate.projectKey,
     ...(candidate.label === undefined ? {} : { label: candidate.label }),
@@ -718,7 +781,10 @@ function parseUpdateProjectGroupInput(
     ...(candidate.color === undefined ? {} : { color: candidate.color }),
     ...(candidate.collapsed === undefined
       ? {}
-      : { collapsed: candidate.collapsed })
+      : { collapsed: candidate.collapsed }),
+    ...(candidate.sidebarCollapsed === undefined
+      ? {}
+      : { sidebarCollapsed: candidate.sidebarCollapsed })
   };
 }
 
@@ -739,4 +805,15 @@ function parseReorderProjectGroupsInput(
     throw new TypeError("Nieprawidłowa kolejność grup.");
   }
   return { projectKeys: [...new Set(projectKeys)] };
+}
+
+function parseSetProjectGroupsCollapsedInput(
+  input: unknown
+): SetProjectGroupsCollapsedInput {
+  const parsed = parseReorderProjectGroupsInput(input);
+  const collapsed = (input as { collapsed?: unknown }).collapsed;
+  if (typeof collapsed !== "boolean") {
+    throw new TypeError("Nieprawidłowy stan grup projektów.");
+  }
+  return { ...parsed, collapsed };
 }

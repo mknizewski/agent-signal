@@ -50,11 +50,13 @@ describe("TrackingStore", () => {
     });
   });
 
-  it("persists sessions, preferences, and project groups as version 5", async () => {
+  it("persists sessions, manual groups, preferences, and project groups as version 6", async () => {
     const directory = await createTemporaryDirectory();
     const store = new TrackingStore(directory);
     const archived = {
       ...trackedSession,
+      titleOverride: "Checkout incident",
+      groupOverride: "customer-portal",
       archivedAt: "2026-07-24T13:00:00.000Z"
     };
 
@@ -69,6 +71,7 @@ describe("TrackingStore", () => {
           symbol: "P",
           color: "#6f82e8",
           collapsed: true,
+          sidebarCollapsed: true,
           order: 0
         }
       ]
@@ -81,7 +84,7 @@ describe("TrackingStore", () => {
       )
     ) as unknown;
     expect(stored).toEqual({
-      version: 5,
+      version: 6,
       trackedSessions: [],
       archivedSessions: [archived],
       preferences: { ...DEFAULT_PREFERENCES, language: "en" },
@@ -92,10 +95,12 @@ describe("TrackingStore", () => {
           symbol: "P",
           color: "#6f82e8",
           collapsed: true,
+          sidebarCollapsed: true,
           order: 0
         }
       ]
     });
+    expect((await store.load()).archivedSessions).toEqual([archived]);
   });
 });
 

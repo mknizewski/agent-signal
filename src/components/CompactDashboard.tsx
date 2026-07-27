@@ -68,6 +68,15 @@ export function CompactDashboard({
         </div>
         <div className="compact-header__actions">
           <button
+            className="icon-button compact-return"
+            type="button"
+            title={copy.titlebar.fullView}
+            aria-label={copy.titlebar.fullView}
+            onClick={onExpand}
+          >
+            <ArrowLeft size={15} />
+          </button>
+          <button
             className="icon-button"
             type="button"
             title={
@@ -83,15 +92,6 @@ export function CompactDashboard({
             onClick={onThemeToggle}
           >
             {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
-          </button>
-          <button
-            className="icon-button compact-return"
-            type="button"
-            title={copy.titlebar.fullView}
-            aria-label={copy.titlebar.fullView}
-            onClick={onExpand}
-          >
-            <ArrowLeft size={15} />
           </button>
           <button
             className="icon-button"
@@ -171,19 +171,12 @@ export function CompactDashboard({
             const subagents = agentSessions.flatMap(
               (session) => session.subagents
             );
-            const activeSubagents = subagents.filter((subagent) =>
-              ["working", "attention"].includes(subagent.status)
-            ).length;
-            const manager =
-              agent === "codex" &&
+            const showSubagents =
               preferences.showSubagentTeams &&
               subagents.length > 0;
             const visibleSummary =
-              manager && activeSubagents > 0
-                ? `${summary} · ${copy.subagents.summary(
-                    activeSubagents,
-                    subagents.length
-                  )}`
+              showSubagents
+                ? `${summary} · ${copy.subagents.summary(subagents.length)}`
                 : summary;
             const sleeping =
               agentSessions.length > 0 &&
@@ -205,7 +198,6 @@ export function CompactDashboard({
                   status={status}
                   size="large"
                   sleeping={sleeping}
-                  manager={manager}
                   motion="compact"
                   language={preferences.language}
                 />

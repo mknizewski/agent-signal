@@ -1,5 +1,7 @@
 import type { ProjectGroupConfig } from "./types";
 
+export const CHAT_SESSION_DRAG_TYPE = "application/x-agent-signal-chat";
+
 const PROJECT_COLORS = [
   "#6f82e8",
   "#2d9f75",
@@ -17,6 +19,7 @@ export interface ProjectGroupPresentation {
   symbol: string;
   color: string;
   collapsed: boolean;
+  sidebarCollapsed: boolean;
   order: number;
 }
 
@@ -24,7 +27,9 @@ export interface SessionProjectGroup<T> extends ProjectGroupPresentation {
   sessions: T[];
 }
 
-export function groupSessionsByProject<T extends { projectName: string }>(
+export function groupSessionsByProject<
+  T extends { projectName: string; groupOverride?: string }
+>(
   sessions: T[],
   grouped: boolean,
   noProjectLabel: string,
@@ -38,6 +43,7 @@ export function groupSessionsByProject<T extends { projectName: string }>(
         symbol: "A",
         color: PROJECT_COLORS[0],
         collapsed: false,
+        sidebarCollapsed: false,
         order: 0,
         sessions
       }
@@ -46,7 +52,7 @@ export function groupSessionsByProject<T extends { projectName: string }>(
 
   const groups = new Map<string, T[]>();
   for (const session of sessions) {
-    const key = session.projectName.trim();
+    const key = sessionProjectGroupKey(session);
     groups.set(key, [...(groups.get(key) ?? []), session]);
   }
 
@@ -56,6 +62,15 @@ export function groupSessionsByProject<T extends { projectName: string }>(
       sessions: entries
     }))
     .sort(compareProjectGroups);
+}
+
+export function sessionProjectGroupKey(session: {
+  projectName: string;
+  groupOverride?: string;
+}): string {
+  return session.groupOverride === undefined
+    ? session.projectName.trim()
+    : session.groupOverride;
 }
 
 export function resolveProjectGroup(
@@ -76,6 +91,7 @@ export function resolveProjectGroup(
         ? config.color
         : defaultProjectColor(projectKey || fallbackName),
     collapsed: config?.collapsed === true,
+    sidebarCollapsed: config?.sidebarCollapsed === true,
     order:
       typeof config?.order === "number" && Number.isFinite(config.order)
         ? config.order
@@ -116,6 +132,9 @@ export function normalizeProjectGroupConfigs(
       ...(symbol ? { symbol } : {}),
       ...(color ? { color } : {}),
       ...(candidate.collapsed === true ? { collapsed: true } : {}),
+      ...(candidate.sidebarCollapsed === true
+        ? { sidebarCollapsed: true }
+        : {}),
       order:
         typeof candidate.order === "number" &&
         Number.isFinite(candidate.order)
@@ -124,6 +143,38 @@ export function normalizeProjectGroupConfigs(
     });
   }
   return [...normalized.values()].sort((left, right) => left.order - right.order);
+}
+
+export function setProjectGroupsCollapsed(
+  configs: ProjectGroupConfig[],
+  projectKeys: string[],
+  collapsed: boolean
+): ProjectGroupConfig[] {
+  const uniqueKeys = [...new Set(projectKeys)];
+  const keySet = new Set(uniqueKeys);
+  const existing = new Map(
+    configs.map((group) => [group.projectKey, group])
+  );
+  const maxOrder = configs.reduce(
+    (highest, group) => Math.max(highest, group.order),
+    -1
+  );
+  const updated = uniqueKeys.map((projectKey, index) => {
+    const group: ProjectGroupConfig = {
+      ...(existing.get(projectKey) ?? {
+        projectKey,
+        order: maxOrder + index + 1
+      })
+    };
+    if (collapsed) group.collapsed = true;
+    else delete group.collapsed;
+    return group;
+  });
+
+  return normalizeProjectGroupConfigs([
+    ...configs.filter((group) => !keySet.has(group.projectKey)),
+    ...updated
+  ]);
 }
 
 export function defaultProjectColor(projectKey: string): string {

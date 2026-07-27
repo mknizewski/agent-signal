@@ -1,5 +1,7 @@
-import { open, readFile, stat } from "node:fs/promises";
+import { open, stat } from "node:fs/promises";
 import type { CodexExternalThread } from "../../src/shared/external-sessions";
+
+const MAX_LOG_READ_BYTES = 2 * 1024 * 1024;
 
 export type CodexLogActivity = "working" | "attention" | "idle" | "unknown";
 
@@ -52,14 +54,15 @@ export class CodexSessionLogTracker {
         previous.path !== logPath ||
         fileStats.size < previous.offset
       ) {
-        const data = await readFile(logPath);
+        const start = Math.max(0, fileStats.size - MAX_LOG_READ_BYTES);
+        const data = await readLogRange(logPath, start, fileStats.size - start);
         const initial: CachedLogState = {
           path: logPath,
-          offset: data.length,
+          offset: fileStats.size,
           remainder: "",
           activity: "unknown"
         };
-        this.consume(initial, data.toString("utf8"));
+        this.consume(initial, completeLogLines(data, start > 0));
         this.states.set(thread.id, initial);
         return initial.activity;
       }
@@ -69,25 +72,24 @@ export class CodexSessionLogTracker {
       }
 
       const length = fileStats.size - previous.offset;
-      const data = Buffer.alloc(length);
-      const handle = await open(logPath, "r");
-      let bytesRead = 0;
-      try {
-        while (bytesRead < length) {
-          const result = await handle.read(
-            data,
-            bytesRead,
-            length - bytesRead,
-            previous.offset + bytesRead
-          );
-          if (result.bytesRead === 0) break;
-          bytesRead += result.bytesRead;
-        }
-      } finally {
-        await handle.close();
+      if (length > MAX_LOG_READ_BYTES) {
+        const start = fileStats.size - MAX_LOG_READ_BYTES;
+        const data = await readLogRange(logPath, start, MAX_LOG_READ_BYTES);
+        const refreshed: CachedLogState = {
+          path: logPath,
+          offset: fileStats.size,
+          remainder: "",
+          activity: "unknown"
+        };
+        this.consume(refreshed, completeLogLines(data, true));
+        this.states.set(thread.id, refreshed);
+        return refreshed.activity;
       }
+
+      const data = await readLogRange(logPath, previous.offset, length);
+      const bytesRead = data.length;
       previous.offset += bytesRead;
-      this.consume(previous, data.subarray(0, bytesRead).toString("utf8"));
+      this.consume(previous, data.toString("utf8"));
       return previous.activity;
     } catch {
       return previous?.activity ?? "unknown";
@@ -107,6 +109,38 @@ export class CodexSessionLogTracker {
       delete state.pendingAttentionCallIds;
     }
   }
+}
+
+async function readLogRange(
+  logPath: string,
+  start: number,
+  length: number
+): Promise<Buffer> {
+  const data = Buffer.alloc(length);
+  const handle = await open(logPath, "r");
+  let bytesRead = 0;
+  try {
+    while (bytesRead < length) {
+      const result = await handle.read(
+        data,
+        bytesRead,
+        length - bytesRead,
+        start + bytesRead
+      );
+      if (result.bytesRead === 0) break;
+      bytesRead += result.bytesRead;
+    }
+  } finally {
+    await handle.close();
+  }
+  return data.subarray(0, bytesRead);
+}
+
+function completeLogLines(data: Buffer, startsMidFile: boolean): string {
+  const text = data.toString("utf8");
+  if (!startsMidFile) return text;
+  const firstLineBreak = text.indexOf("\n");
+  return firstLineBreak >= 0 ? text.slice(firstLineBreak + 1) : "";
 }
 
 export function reduceCodexLogLines(
