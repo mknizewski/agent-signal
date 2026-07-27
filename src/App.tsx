@@ -430,6 +430,19 @@ export default function App() {
     }
   };
 
+  const renameSession = async (
+    sessionId: string,
+    titleOverride: string | null
+  ) => {
+    try {
+      setSnapshot(
+        await agentApi.updateTrackedSession({ sessionId, titleOverride })
+      );
+    } catch (error) {
+      showError(error);
+    }
+  };
+
   const openSession = async (sessionId: string) => {
     try {
       await agentApi.openSession(sessionId);
@@ -1277,6 +1290,7 @@ export default function App() {
                               onOpen={openSession}
                               onOpenSubagent={openCodexThread}
                               onTogglePin={togglePin}
+                              onRename={renameSession}
                               projectGroups={allProjectGroups}
                               onAssignGroup={assignSessionGroup}
                               dragging={draggedSessionId === session.id}

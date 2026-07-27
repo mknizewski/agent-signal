@@ -42,6 +42,7 @@ describe("TrackedChatRow group controls", () => {
         onOpen={vi.fn()}
         onOpenSubagent={vi.fn()}
         onTogglePin={vi.fn()}
+        onRename={vi.fn()}
         onAssignGroup={vi.fn()}
         onDragStart={vi.fn()}
         onDragEnd={vi.fn()}
@@ -52,6 +53,7 @@ describe("TrackedChatRow group controls", () => {
     expect(html).toContain("Przeciągnij czat do innej grupy");
     expect(html).toContain('aria-haspopup="menu"');
     expect(html).toContain("Przenieś czat do grupy");
+    expect(html).toContain("Zmień nazwę czatu");
     expect(html).not.toContain("<select");
   });
 });

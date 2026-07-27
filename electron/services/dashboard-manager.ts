@@ -59,8 +59,7 @@ export class DashboardManager {
     this.preferences = normalizePreferences(state.preferences);
     this.projectGroups = normalizeProjectGroupConfigs(state.projectGroups);
     this.providers = detectProviders();
-    this.emit();
-    this.startExternalSync();
+    await this.startExternalSync();
   }
 
   getSnapshot(): AppSnapshot {
@@ -74,14 +73,15 @@ export class DashboardManager {
       this.records,
       this.catalog,
       this.preferences.autoGroupProjects
-    ).map((session) => ({
-      ...session,
-      subagents: session.threadId
-        ? (subagentsByParent.get(session.threadId) ?? []).sort(
-            compareSubagents
-          )
-        : []
-    }));
+    ).map((session) => {
+      const parentId = session.threadId || session.sessionId;
+      return {
+        ...session,
+        subagents: parentId
+          ? (subagentsByParent.get(parentId) ?? []).sort(compareSubagents)
+          : []
+      };
+    });
     return {
       trackedSessions,
       archivedSessions: this.archivedRecords,
@@ -204,6 +204,14 @@ export class DashboardManager {
       record.pinned = this.preferences.enablePinning
         ? input.pinned
         : false;
+    }
+    if (input.titleOverride !== undefined) {
+      if (input.titleOverride === null) delete record.titleOverride;
+      else {
+        const titleOverride = input.titleOverride.trim().slice(0, 120);
+        if (titleOverride) record.titleOverride = titleOverride;
+        else delete record.titleOverride;
+      }
     }
     if (typeof input.projectName === "string") {
       record.projectName = input.projectName.trim().slice(0, 80);
@@ -358,13 +366,19 @@ export class DashboardManager {
     await this.saveQueue;
   }
 
-  private startExternalSync(): void {
+  private async startExternalSync(): Promise<void> {
     this.externalSessionSync = new ExternalSessionSync({
       getCodexExecutable: () => this.providers.codex.executable,
       getTrackedCodexThreadIds: () =>
         this.records.flatMap((record) =>
           record.source === "codex-app" && record.threadId
             ? [record.threadId]
+            : []
+        ),
+      getTrackedClaudeSessionIds: () =>
+        this.records.flatMap((record) =>
+          record.source === "claude-code" && record.sessionId
+            ? [record.sessionId]
             : []
         ),
       onSessions: (sessions, subagents) => {
@@ -398,7 +412,7 @@ export class DashboardManager {
         console.warn(message, error);
       }
     });
-    void this.externalSessionSync.start().catch((error) => {
+    await this.externalSessionSync.start().catch((error) => {
       console.warn("Nie udało się uruchomić katalogu sesji.", error);
     });
   }

@@ -34,13 +34,20 @@ export function createArchivedSessionRecord(
   const latestRecord = currentSession
     ? {
         ...createTrackingRecord(currentSession, record.trackedAt),
+        title: record.titleOverride || currentSession.title,
         projectName: record.projectName || currentSession.projectName,
+        ...(record.titleOverride === undefined
+          ? {}
+          : { titleOverride: record.titleOverride }),
         ...(record.groupOverride === undefined
           ? {}
           : { groupOverride: record.groupOverride }),
         pinned: record.pinned ?? false
       }
-    : record;
+    : {
+        ...record,
+        title: record.titleOverride || record.title
+      };
   return { ...latestRecord, archivedAt };
 }
 
@@ -63,9 +70,13 @@ export function resolveTrackedSessions(
     if (current) {
       return {
         ...current,
+        title: record.titleOverride || current.title,
         projectName: autoGroupProjects
           ? current.projectName
           : record.projectName,
+        ...(record.titleOverride === undefined
+          ? {}
+          : { titleOverride: record.titleOverride }),
         ...(record.groupOverride === undefined
           ? {}
           : { groupOverride: record.groupOverride }),
@@ -78,6 +89,7 @@ export function resolveTrackedSessions(
 
     return {
       ...record,
+      title: record.titleOverride || record.title,
       projectName: record.projectName,
       pinned: record.pinned ?? false,
       status: "unavailable",

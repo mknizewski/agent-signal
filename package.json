@@ -1,6 +1,6 @@
 {
   "name": "agent-signal",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "Minimal desktop dashboard for tracking Codex and Claude Code sessions.",
   "main": "dist-electron/electron/main.js",
   "author": "Agent Signal",

@@ -895,6 +895,72 @@ input:focus-visible {
   font-weight: 550;
 }
 
+.chat-row__rename {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 5px;
+  color: var(--subtle);
+  background: transparent;
+  opacity: 0;
+}
+
+.chat-row:hover .chat-row__rename,
+.chat-row__rename:focus-visible,
+.chat-row__rename.is-active {
+  opacity: 1;
+}
+
+.chat-row__rename:hover,
+.chat-row__rename.is-active {
+  color: var(--text);
+  background: var(--canvas);
+}
+
+.chat-row__rename-form {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 3px;
+}
+
+.chat-row__rename-form input {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  padding: 0 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--surface);
+  font: inherit;
+  font-size: 11px;
+  outline: none;
+}
+
+.chat-row__rename-form input:focus {
+  border-color: color-mix(in srgb, var(--working) 55%, var(--line-strong));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--working) 10%, transparent);
+}
+
+.chat-row__rename-form button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 5px;
+  color: var(--subtle);
+  background: transparent;
+}
+
+.chat-row__rename-form button:hover {
+  color: var(--text);
+  background: var(--canvas);
+}
+
 .chat-row__identity p {
   overflow: hidden;
   margin: 5px 0 0;
@@ -2867,7 +2933,7 @@ html[data-compact="true"] body {
 
 .compact-header {
   display: flex;
-  height: 50px;
+  height: var(--titlebar-height);
   align-items: center;
   justify-content: space-between;
   padding: 0 142px 0 12px;
@@ -2900,7 +2966,7 @@ html[data-compact="true"] body {
 
 .compact-dashboard {
   display: flex;
-  height: calc(100vh - 50px);
+  height: calc(100vh - var(--titlebar-height));
   flex-direction: column;
   padding: 15px 16px 11px;
 }
