@@ -66,9 +66,11 @@ export interface ClaudeExternalSession {
   cwd?: string;
   createdAt?: number;
   tag?: string;
+  logActivity?: "working" | "attention" | "idle" | "error" | "unknown";
 }
 
 const EXTERNAL_ACTIVITY_WINDOW_MS = 12_000;
+const CLAUDE_OPEN_TURN_STALE_MS = 30 * 60_000;
 
 export function mapCodexThread(
   thread: CodexExternalThread,
@@ -204,10 +206,7 @@ export function mapClaudeSession(
     session.createdAt ?? session.lastModified
   ).toISOString();
   const updatedAt = new Date(session.lastModified).toISOString();
-  const recentlyActive =
-    Math.abs(now.getTime() - session.lastModified) <=
-    EXTERNAL_ACTIVITY_WINDOW_MS;
-  const status: SessionStatus = recentlyActive ? "working" : "idle";
+  const status = claudeStatus(session, now);
   const title =
     cleanText(session.customTitle) ||
     cleanText(session.summary) ||
@@ -224,13 +223,31 @@ export function mapClaudeSession(
     workingDirectory,
     projectName: projectNameFromPath(workingDirectory),
     status,
-    statusText: recentlyActive
-      ? "Aktywność wykryta w Claude Code"
-      : "Sesja jest bezczynna",
+    statusText: claudeStatusText(status),
     createdAt,
     updatedAt,
     sessionId: session.sessionId
   };
+}
+
+function claudeStatus(
+  session: ClaudeExternalSession,
+  now: Date
+): SessionStatus {
+  if (session.logActivity === "attention") return "attention";
+  if (session.logActivity === "error") return "error";
+  if (session.logActivity === "idle") return "idle";
+  if (session.logActivity === "working") {
+    const openTurnIsFresh =
+      Math.abs(now.getTime() - session.lastModified) <=
+      CLAUDE_OPEN_TURN_STALE_MS;
+    return openTurnIsFresh ? "working" : "unavailable";
+  }
+
+  const recentlyActive =
+    Math.abs(now.getTime() - session.lastModified) <=
+    EXTERNAL_ACTIVITY_WINDOW_MS;
+  return recentlyActive ? "working" : "idle";
 }
 
 function codexStatus(
@@ -348,6 +365,16 @@ function codexStatusText(status: SessionStatus): string {
   if (status === "error") return "Sesja Codexa zgłosiła błąd";
   if (status === "idle") return "Sesja jest bezczynna";
   return "Nie można potwierdzić stanu sesji Codexa";
+}
+
+function claudeStatusText(status: SessionStatus): string {
+  if (status === "attention") {
+    return "Claude Code czeka na zatwierdzenie lub odpowiedź";
+  }
+  if (status === "working") return "Aktywna tura w Claude Code";
+  if (status === "error") return "Sesja Claude Code zgłosiła błąd";
+  if (status === "idle") return "Sesja jest bezczynna";
+  return "Nie można potwierdzić stanu sesji Claude Code";
 }
 
 function cleanText(value: unknown): string {

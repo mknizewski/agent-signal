@@ -1,5 +1,7 @@
 import type { ProjectGroupConfig } from "./types";
 
+export const CHAT_SESSION_DRAG_TYPE = "application/x-agent-signal-chat";
+
 const PROJECT_COLORS = [
   "#6f82e8",
   "#2d9f75",
@@ -25,7 +27,9 @@ export interface SessionProjectGroup<T> extends ProjectGroupPresentation {
   sessions: T[];
 }
 
-export function groupSessionsByProject<T extends { projectName: string }>(
+export function groupSessionsByProject<
+  T extends { projectName: string; groupOverride?: string }
+>(
   sessions: T[],
   grouped: boolean,
   noProjectLabel: string,
@@ -48,7 +52,7 @@ export function groupSessionsByProject<T extends { projectName: string }>(
 
   const groups = new Map<string, T[]>();
   for (const session of sessions) {
-    const key = session.projectName.trim();
+    const key = sessionProjectGroupKey(session);
     groups.set(key, [...(groups.get(key) ?? []), session]);
   }
 
@@ -58,6 +62,15 @@ export function groupSessionsByProject<T extends { projectName: string }>(
       sessions: entries
     }))
     .sort(compareProjectGroups);
+}
+
+export function sessionProjectGroupKey(session: {
+  projectName: string;
+  groupOverride?: string;
+}): string {
+  return session.groupOverride === undefined
+    ? session.projectName.trim()
+    : session.groupOverride;
 }
 
 export function resolveProjectGroup(

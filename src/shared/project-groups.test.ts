@@ -90,6 +90,40 @@ describe("project group presentation", () => {
     ]);
   });
 
+  it("uses a manual group override without changing the detected project", () => {
+    const groups = groupSessionsByProject(
+      [
+        sessions[0],
+        { ...sessions[1], groupOverride: "checkout-service" }
+      ],
+      true,
+      "No project",
+      []
+    );
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].key).toBe("checkout-service");
+    expect(groups[0].sessions.map((session) => session.id)).toEqual([
+      "one",
+      "two"
+    ]);
+    expect(groups[0].sessions[1].projectName).toBe("customer-portal");
+  });
+
+  it("allows an explicit assignment to the no-project group", () => {
+    const groups = groupSessionsByProject(
+      [{ ...sessions[0], groupOverride: "" }, sessions[1]],
+      true,
+      "No project",
+      []
+    );
+
+    expect(groups.map((group) => group.key).sort()).toEqual([
+      "",
+      "customer-portal"
+    ]);
+  });
+
   it("collapses and expands all requested groups without losing metadata", () => {
     const groups = [
       {

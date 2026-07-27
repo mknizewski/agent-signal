@@ -253,19 +253,33 @@ const demoApi: AgentSignalApi = {
   updateTrackedSession: async (input) => {
     demoSnapshot = {
       ...demoSnapshot,
-      trackedSessions: demoSnapshot.trackedSessions.map((item) =>
-        item.id === input.sessionId
-          ? {
-              ...item,
-              ...(input.pinned === undefined
-                ? {}
-                : { pinned: input.pinned }),
-              ...(input.projectName === undefined
-                ? {}
-                : { projectName: input.projectName })
-            }
-          : item
-      )
+      trackedSessions: demoSnapshot.trackedSessions.map((item) => {
+        if (item.id !== input.sessionId) return item;
+        const next: TrackedSession = {
+          ...item,
+          ...(input.pinned === undefined
+            ? {}
+            : { pinned: input.pinned }),
+          ...(input.projectName === undefined
+            ? {}
+            : { projectName: input.projectName })
+        };
+        if (input.titleOverride === null) {
+          delete next.titleOverride;
+          next.title =
+            demoCatalog.find((session) => session.id === item.id)?.title ||
+            next.title;
+        }
+        else if (input.titleOverride !== undefined) {
+          next.titleOverride = input.titleOverride;
+          next.title = input.titleOverride;
+        }
+        if (input.groupOverride === null) delete next.groupOverride;
+        else if (input.groupOverride !== undefined) {
+          next.groupOverride = input.groupOverride;
+        }
+        return next;
+      })
     };
     emitDemo();
     return demoSnapshot;

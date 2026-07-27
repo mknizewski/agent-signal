@@ -19,6 +19,7 @@ describe("SubagentTeamPanel", () => {
     const markup = renderToStaticMarkup(
       <SubagentTeamPanel
         subagents={[subagent]}
+        agent="codex"
         language="pl"
         onOpen={() => undefined}
       />
@@ -28,5 +29,19 @@ describe("SubagentTeamPanel", () => {
     expect(markup).toContain("status-pet--presence");
     expect(markup).not.toContain("Stan nieznany");
     expect(markup).not.toContain("subagent-card__status");
+  });
+
+  it("uses the Claude pet for a Claude subagent team", () => {
+    const markup = renderToStaticMarkup(
+      <SubagentTeamPanel
+        subagents={[subagent]}
+        agent="claude"
+        language="pl"
+        onOpen={() => undefined}
+      />
+    );
+
+    expect(markup).toContain("status-pet--claude");
+    expect(markup).toContain("1 wykryty subagent");
   });
 });

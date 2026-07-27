@@ -15,7 +15,10 @@ import type {
   AppLanguage,
   UpdateProjectGroupInput
 } from "../shared/types";
-import type { ProjectGroupPresentation } from "../shared/project-groups";
+import {
+  CHAT_SESSION_DRAG_TYPE,
+  type ProjectGroupPresentation
+} from "../shared/project-groups";
 import { copyFor } from "../lib/i18n";
 
 interface ProjectGroupHeaderProps {
@@ -25,6 +28,7 @@ interface ProjectGroupHeaderProps {
   language: AppLanguage;
   draggable: boolean;
   dragging: boolean;
+  chatDragging: boolean;
   dropPosition: "before" | "after" | null;
   onUpdate(input: UpdateProjectGroupInput): Promise<void>;
   onDragStart(projectKey: string): void;
@@ -48,6 +52,7 @@ export function ProjectGroupHeader({
   language,
   draggable,
   dragging,
+  chatDragging,
   dropPosition,
   onUpdate,
   onDragStart,
@@ -111,6 +116,12 @@ export function ProjectGroupHeader({
       data-project-key={group.key}
       style={{ "--project-color": group.color } as CSSProperties}
       onDragOver={(event) => {
+        if (
+          chatDragging ||
+          event.dataTransfer.types.includes(CHAT_SESSION_DRAG_TYPE)
+        ) {
+          return;
+        }
         if (!draggable) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = "move";
@@ -122,6 +133,12 @@ export function ProjectGroupHeader({
         onDragHover(group.key, position);
       }}
       onDrop={(event) => {
+        if (
+          chatDragging ||
+          event.dataTransfer.types.includes(CHAT_SESSION_DRAG_TYPE)
+        ) {
+          return;
+        }
         event.preventDefault();
         const bounds = event.currentTarget.getBoundingClientRect();
         const position =
