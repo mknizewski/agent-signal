@@ -107,8 +107,6 @@ keeps an open turn in **Working** until Claude records an explicit turn end.
 Unresolved `AskUserQuestion` and `ExitPlanMode` calls are shown as
 **Approval needed**.
 
-Consumer Claude Chat and Cowork conversations are not imported.
-
 ### Notification behavior
 
 The dashboard reflects status immediately. Desktop and mobile notifications
