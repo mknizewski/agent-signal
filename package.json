@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.220",
-    "lucide-react": "1.27.0",
+    "lucide-react": "1.28.0",
     "node-forge": "^1.4.0",
     "qrcode": "^1.5.4",
     "react": "19.2.8",
